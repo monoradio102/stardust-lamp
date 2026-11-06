@@ -11,7 +11,7 @@
 
 <br>
 
-<img src="hardware/images/pcb_top.png" width="720" alt="星屑灯の基板">
+<img src="hardware/images/pcb_black.png" width="900" alt="星屑灯の基板（左が表、右が裏）">
 
 </div>
 
