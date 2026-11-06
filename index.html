@@ -5,212 +5,763 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>星屑灯 モニター</title>
 <meta name="description" content="星屑灯（2 本の GM 管で宇宙線を数えるランプ）の Web シリアル モニター">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400&family=Inter:wght@200;300;400;500&family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   :root {
-    --bg: #0d1424; --panel: #16213a; --line: #26324f; --text: #e8ecf5; --muted: #8e9ab5;
-    --a: #7fb3ff; --b: #ffb36b; --c: #fff3c4; --d: #6b7590; --ok: #5fd38d; --warn: #ff7a7a;
+    --bg: #0b0c0e; --line: rgba(255,255,255,.08); --line2: rgba(255,255,255,.16);
+    --text: #eeece8; --muted: #b0b0b5; --dim: #85868c;
+    --a: #a9bccd; --b: #cfb79d; --c: #ffffff; --ok: #9cc5a1; --warn: #d98c8c;
+    --sans: "Inter", "Noto Sans JP", "Hiragino Sans", system-ui, sans-serif;
+    --jp: "Noto Sans JP", "Hiragino Sans", system-ui, sans-serif;
+  }
+  :root { --rowflash: rgba(255,255,255,.06); --thumb: #2a2b2f; --cellline: rgba(255,255,255,.025); --hoverline: rgba(255,255,255,.4); }
+  :root[data-theme="light"] {
+    --bg: #ffffff; --line: rgba(0,0,0,.10); --line2: rgba(0,0,0,.28);
+    --text: #111111; --muted: #4a4a4d; --dim: #858589;
+    --a: #2f5f8a; --b: #a3602a; --c: #111111; --ok: #2e7d32; --warn: #c62828;
+    --rowflash: rgba(0,0,0,.05); --thumb: #cfcfcf; --cellline: rgba(0,0,0,.05); --hoverline: rgba(0,0,0,.5);
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text);
-         font-family: "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif; }
-  header { display: flex; align-items: baseline; gap: 16px; padding: 18px 24px 6px; flex-wrap: wrap; }
-  h1 { font-size: 22px; margin: 0; letter-spacing: .05em; }
-  #conn { font-size: 13px; color: var(--muted); }
-  #conn::before { content: "●"; margin-right: 6px; color: var(--warn); }
-  #conn.on::before { color: var(--ok); }
-  header button { margin-left: auto; }
-  header button ~ button { margin-left: 0; }
-  #fault { display: none; margin: 8px 24px 0; padding: 10px 14px; border-radius: 8px;
-           background: #4a1d26; color: #ffd0d6; font-size: 14px; }
-  main { padding: 12px 24px 32px; display: grid; gap: 16px; }
-  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
-  .card .label { font-size: 12px; color: var(--muted); }
-  .card .value { font-size: 28px; font-weight: 600; margin-top: 4px; font-variant-numeric: tabular-nums; }
-  .card .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
-  .row { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
-  @media (max-width: 900px) { .row { grid-template-columns: 1fr; } }
-  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
-  .panel h2 { font-size: 14px; margin: 0 0 10px; color: var(--muted); font-weight: 500; }
-  .chart { position: relative; height: 240px; }
-  #events, #msgs { list-style: none; margin: 0; padding: 0; max-height: 240px; overflow-y: auto; font-size: 13px; }
-  #events li { padding: 6px 0; border-bottom: 1px solid var(--line); display: flex; gap: 10px; }
-  #events .t { color: var(--muted); font-variant-numeric: tabular-nums; }
-  #msgs li { padding: 3px 0; color: var(--muted); font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
-  .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-  button, input { font: inherit; font-size: 14px; border-radius: 8px; border: 1px solid var(--line);
-                  background: #1e2b4a; color: var(--text); padding: 8px 14px; }
-  button { cursor: pointer; }
-  button:hover { background: #26375f; }
-  button.on { background: #3a4f86; border-color: #6d86c9; }
-  input { width: 90px; }
-  .sep { width: 1px; height: 28px; background: var(--line); margin: 0 4px; }
-  #star { position: fixed; inset: 0; pointer-events: none; opacity: 0;
-          background: radial-gradient(circle at 50% 30%, rgba(255,243,196,.35), transparent 55%); }
-  #star.flash { animation: glow 3s ease-out; }
-  @keyframes glow { 0% { opacity: 1; } 100% { opacity: 0; } }
+  html, body { background: var(--bg); }
+  body { margin: 0; color: var(--text); font-family: var(--jp); font-weight: 400; font-size: 14px; line-height: 1.6;
+         -webkit-font-smoothing: antialiased; letter-spacing: .02em; }
+  a { color: var(--text); }
+  .app { display: flex; flex-direction: column; min-height: 100vh; padding: 0 32px 22px; max-width: 1320px; margin: 0 auto; }
+  @media (max-width: 600px) { .app { padding: 0 16px 16px; } }
+
+  header { display: flex; align-items: center; gap: 24px; padding: 16px 0 14px; flex-wrap: wrap; }
+  h1 { font-family: var(--jp); font-weight: 400; font-size: 15px; letter-spacing: .3em; margin: 0; }
+  .pill { font-size: 12.5px; color: var(--muted); display: inline-flex; align-items: center; gap: 8px; }
+  .pill::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--dim); }
+  .pill.on::before { background: var(--ok); }
+  .pill.stale::before { background: var(--warn); }
+  header .spacer { flex: 1; }
+
+  button, input { font: inherit; color: var(--text); }
+  button { cursor: pointer; background: transparent; border: 1px solid var(--line2); border-radius: 2px;
+           padding: 7px 16px; font-size: 13px; letter-spacing: .06em; transition: border-color .2s, color .2s, background .2s; }
+  button:hover { border-color: var(--hoverline); }
+  button.primary { background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 400; }
+  button.primary:hover { opacity: .88; }
+  button:disabled { opacity: .35; cursor: default; }
+  button.ghost { border-color: transparent; color: var(--muted); padding: 7px 4px; }
+  button.ghost:hover { color: var(--text); }
+  input { background: transparent; border: none; border-bottom: 1px solid var(--line2); border-radius: 0; padding: 5px 2px; width: 72px;
+          font-family: var(--sans); font-size: 14px; font-variant-numeric: tabular-nums; text-align: right; }
+  input:focus { outline: none; border-bottom-color: var(--text); }
+  .seg { display: inline-flex; gap: 18px; }
+  .seg button { border: none; padding: 4px 0; font-size: 13px; color: var(--dim); border-bottom: 1px solid transparent; border-radius: 0; }
+  .seg button:hover { color: var(--muted); }
+  .seg button.on { color: var(--text); border-bottom-color: var(--text); }
+
+  .notice { margin: 0 0 14px; padding: 10px 0; font-size: 13px; display: none; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  #nosupport { color: var(--muted); }
+  #fault { color: var(--warn); }
+
+  .main { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 40px; min-height: 0; }
+  .left { display: flex; flex-direction: column; gap: 22px; min-height: 0; }
+  .left .hero { flex: 1 1 0; min-height: 160px; }
+  .data { flex: .9 1 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 156px; gap: 20px; margin-top: 18px; }
+  @media (max-width: 1180px) { .data { grid-template-columns: 1fr; } .data .col + .col { display: none; } }
+  .data .col { display: flex; flex-direction: column; min-height: 0; }
+  .data .head { display: flex; align-items: baseline; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+  .data .head .label { color: var(--muted); }
+  .data .head .sub { font-size: 12px; color: var(--dim); }
+  .data .head { white-space: nowrap; }
+  button.link { border: none; padding: 0 0 0 14px; font-size: 12px; color: var(--muted); letter-spacing: .04em; }
+  button.link:hover { color: var(--text); }
+  button.link.primary { background: none; color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
+  .scroll { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--thumb) transparent; }
+  .mono { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; font-weight: 400; font-variant-numeric: tabular-nums; }
+  table.log { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.log th { position: sticky; top: 0; background: var(--bg); font-weight: 400; color: var(--dim); text-align: right;
+                 padding: 7px 6px 6px; font-size: 12px; letter-spacing: .08em; border-bottom: 1px solid var(--line); }
+  table.log td { text-align: right; padding: 4px 6px; color: var(--muted); border-bottom: 1px solid var(--cellline); white-space: nowrap; }
+  table.log th:first-child, table.log td:first-child { text-align: left; padding-left: 0; }
+  table.log td.a { color: var(--a); } table.log td.b { color: var(--b); }
+  table.log tr.hit td { color: var(--text); }
+  table.log tr.hit td.c { font-weight: 400; }
+  table.log tr.new td { animation: rowin 1.6s ease-out; }
+  @keyframes rowin { from { background: var(--rowflash); } to { background: transparent; } }
+  #feed { list-style: none; margin: 0; padding: 4px 0 0; font-size: 12.5px; }
+  #feed li { display: flex; justify-content: space-between; padding: 3px 0; color: var(--dim); }
+  #feed li b { font-weight: 400; }
+  #feed li.A b { color: var(--a); } #feed li.B b { color: var(--b); } #feed li.C { color: var(--muted); } #feed li.C b { color: var(--text); }
+  .empty { font-size: 12.5px; color: var(--dim); padding: 10px 0; }
+  @media (min-width: 1000px) and (min-height: 600px) { .app { height: 100vh; } .main { height: 0; } }
+  .left { gap: 0; }
+  .left .stats { margin-top: 22px; }
+  @media (max-width: 999px) { .main { grid-template-columns: 1fr; grid-template-rows: none; gap: 28px; } .left .hero { flex: none; height: 320px; } .tabs { flex: none; height: 520px; } .data { height: 420px; flex: none; } }
+  @media (max-width: 520px) { .stats { grid-template-columns: repeat(2, 1fr); } .stat .v { font-size: 30px; } }
+
+  :root[data-theme="light"] .hero { background: #fff; --text: #111; --muted: #4a4a4d; --dim: #858589; --a: #2f5f8a; --b: #a3602a; --c: #111; }
+  .fw { font-size: 12px; color: var(--dim); }
+  .theme { font-size: 12.5px; color: var(--muted); border: none; padding: 4px 0; letter-spacing: .12em; }
+  .theme:hover { color: var(--text); }
+  .hero { position: relative; overflow: hidden; min-height: 0; background: #08090b; border: 1px solid var(--line);
+          --text: #eeece8; --muted: #b0b0b5; --dim: #85868c; --a: #a9bccd; --b: #cfb79d; --c: #ffffff; color: var(--text); }
+
+  #sky { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .hero .tl { position: absolute; left: 26px; top: 22px; }
+  .hero .tr { position: absolute; right: 26px; top: 24px; text-align: right; }
+  .hero .br { position: absolute; right: 26px; bottom: 18px; }
+  .hero .bl { position: absolute; left: 26px; bottom: 18px; }
+  @media (max-width: 600px) { .hero .tl, .hero .bl { left: 18px; } .hero .tr, .hero .br { right: 18px; } .hero .tl, .hero .tr { top: 18px; } }
+  .label { font-size: 12.5px; color: var(--muted); letter-spacing: .12em; }
+  .hero .big { font-family: var(--sans); font-weight: 200; font-size: 84px; line-height: 1; margin: 14px 0 0 -4px;
+               letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  @media (max-width: 600px) { .hero .big { font-size: 72px; } }
+  .hero .last { font-size: 12.5px; color: var(--muted); margin-top: 12px; letter-spacing: .08em; }
+  .hero .last b { font-family: var(--sans); font-weight: 400; color: var(--text); margin-left: 10px; font-variant-numeric: tabular-nums; }
+  .modebadge .name { font-size: 15px; font-weight: 400; letter-spacing: .2em; margin-top: 6px; }
+  .modebadge .desc { font-size: 12.5px; color: var(--dim); margin-top: 2px; }
+  .legend { display: flex; gap: 22px; font-size: 12.5px; color: var(--muted); }
+  .legend span::before { content: ""; display: inline-block; width: 14px; height: 1px; margin-right: 8px; vertical-align: middle; }
+  .legend .la::before { background: var(--a); } .legend .lb::before { background: var(--b); } .legend .lc::before { background: var(--c); }
+  #demo { font-size: 12.5px; color: var(--dim); display: none; }
+  @media (max-width: 760px) { .legend, .modebadge .desc { display: none; } }
+
+  .side { display: flex; flex-direction: column; min-height: 0; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); border-left: 1px solid var(--line); flex: none; }
+  .stat { padding: 14px 18px 14px; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); min-width: 0; }
+  .stat .k { font-size: 12.5px; color: var(--muted); letter-spacing: .1em; }
+  .stat .v { font-family: var(--sans); font-weight: 300; font-size: 38px; line-height: 1.2; margin-top: 4px;
+             font-variant-numeric: tabular-nums; white-space: nowrap; letter-spacing: -.01em; }
+  .stat .v small { font-family: var(--jp); font-weight: 300; font-size: 12.5px; color: var(--muted); margin-left: 5px; letter-spacing: .04em; }
+  .stat .s { font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 10px; }
+
+  .tabs { flex: 1.4 1 0; display: flex; flex-direction: column; min-height: 0; }
+  .tabbar { display: flex; gap: 22px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+  .tabbar button { border: none; border-radius: 0; padding: 0 0 10px; font-size: 13px; color: var(--dim); letter-spacing: .12em;
+                   border-bottom: 1px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+  .tabbar button:hover { color: var(--muted); }
+  .tabbar button.on { color: var(--text); border-bottom-color: var(--text); }
+  .tabbar .sep { flex: 1; }
+  .pane { display: none; flex: 1; min-height: 0; padding: 12px 0 0; overflow-y: auto; flex-direction: column; gap: 6px; }
+  .pane.on { display: flex; }
+  .pane h3 { font-size: 12.5px; font-weight: 400; letter-spacing: .12em; color: var(--muted); margin: 0; display: flex; align-items: center; gap: 10px; }
+  .pane h3 .seg { margin-left: auto; }
+  .grow { flex: 1; min-height: 90px; position: relative; }
+  .chartbox { position: relative; height: 150px; }
+
+  #events { list-style: none; margin: 0; padding: 0; }
+  #events li { display: flex; align-items: baseline; gap: 16px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; color: var(--dim); }
+  #events li .t { font-family: var(--sans); font-weight: 400; font-size: 15px; color: var(--text); font-variant-numeric: tabular-nums; min-width: 78px; }
+  #events li .st { display: none; }
+
+  .field { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .field.set { display: grid; grid-template-columns: 1fr 72px 24px auto; }
+  .field label { flex: 1; min-width: 0; font-size: 13.5px; }
+  .field label small { display: block; font-size: 12px; color: var(--dim); }
+  .field .unit { font-size: 12.5px; color: var(--muted); }
+  .field button { padding: 5px 12px; font-size: 12.5px; }
+  .row-btns { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .note { font-size: 12px; color: var(--dim); line-height: 1.8; }
+  #msgs { list-style: none; margin: 0; padding: 0; font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; color: var(--muted); }
+  #msgs li { padding: 2px 0; }
+
+  #toast { position: fixed; left: 50%; bottom: 32px; transform: translate(-50%, 12px); opacity: 0; pointer-events: none;
+           background: var(--text); color: var(--bg); padding: 10px 20px; font-size: 13px; letter-spacing: .06em;
+           transition: opacity .3s, transform .3s; z-index: 10; }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
 </style>
 </head>
 <body>
-<div id="star"></div>
+<div class="app">
 <header>
-  <h1>星屑灯 v1</h1>
-  <span id="conn">つないでいません</span>
-  <button id="connect">基板につなぐ</button>
-  <button id="csv">CSV を保存</button>
-  <button id="clear">記録を消す</button>
-</header>
-<div id="nosupport" style="display:none;margin:8px 24px 0;padding:10px 14px;border-radius:8px;background:#3a3420;color:#ffe9a8;font-size:14px">
-  このブラウザは Web シリアルに対応していません。パソコンの Chrome か Edge で開いてください。</div>
-<div id="fault"></div>
-<main>
-  <section class="cards">
-    <div class="card"><div class="label">高圧</div><div class="value" id="hv">—</div><div class="sub" id="hvt">目標 —</div></div>
-    <div class="card"><div class="label">モード</div><div class="value" id="mode">—</div><div class="sub" id="win">時間窓 —</div></div>
-    <div class="card"><div class="label">管 A（毎分）</div><div class="value" id="cpmA" style="color:var(--a)">—</div><div class="sub">直近 10 分の平均</div></div>
-    <div class="card"><div class="label">管 B（毎分）</div><div class="value" id="cpmB" style="color:var(--b)">—</div><div class="sub">直近 10 分の平均</div></div>
-    <div class="card"><div class="label">宇宙線の候補（2 本同時）</div><div class="value" id="cph" style="color:var(--c)">—</div><div class="sub" id="ctoday">今日 —</div></div>
-    <div class="card"><div class="label">偶然の一致の目安</div><div class="value" id="dtoday">—</div><div class="sub">1 ms ずらした同時（今日）</div></div>
-  </section>
-
-  <div class="row">
-    <div class="panel"><h2>管ごとのカウント（毎分）</h2><div class="chart"><canvas id="cpmChart"></canvas></div></div>
-    <div class="panel"><h2>宇宙線の候補が来た時刻</h2><ul id="events"></ul></div>
+  <h1>星屑灯</h1>
+  <span id="conn" class="pill">未接続</span>
+  <span id="fw" class="fw mono"></span>
+  <button id="theme" class="theme" title="白黒を反転">反転</button>
+  <span class="spacer"></span>
+  <div class="seg modes" title="光り方">
+    <button data-mode="cosmic">宇宙線</button><button data-mode="rad">放射線</button><button data-mode="digital">デジタル</button>
   </div>
+  <button id="connect" class="primary">基板につなぐ</button>
+</header>
 
-  <div class="panel"><h2>2 本同時の回数（10 分ごと）</h2><div class="chart"><canvas id="coChart"></canvas></div></div>
+<div id="nosupport" class="notice">このブラウザは Web シリアルに対応していません。パソコンの Chrome か Edge で開くと、基板につないで記録できます。</div>
+<div id="fault" class="notice"></div>
 
-  <div class="panel">
-    <h2>操作</h2>
-    <div class="controls">
-      <button data-mode="cosmic">cosmic</button>
-      <button data-mode="rad">rad</button>
-      <button data-mode="digital">digital</button>
-      <span class="sep"></span>
-      <input id="hvIn" type="number" min="0" max="450" step="5" placeholder="380"> V
-      <button id="hvSet">高圧を設定</button>
-      <button id="hvOff">高圧を止める</button>
-      <span class="sep"></span>
-      <button id="kick">LED を光らせる</button>
-      <button id="save">設定を保存</button>
+<div class="main">
+  <div class="left">
+  <div class="hero">
+    <canvas id="sky"></canvas>
+    <div class="bl">
+      <div id="demo">デモ表示 — 基板をつなぐと、実際の反応が映ります</div>
+    </div>
+  </div>
+  <div class="stats kpi">
+      <div class="stat"><div class="k">宇宙線</div><div class="v" id="sC">—<small>/時</small></div><div class="s" id="sCs">2 本同時、直近 1 時間</div></div>
+      <div class="stat"><div class="k">管 A</div><div class="v" id="sA" style="color:var(--a)">—<small>/分</small></div><div class="s">直近 10 分の平均</div></div>
+      <div class="stat"><div class="k">管 B</div><div class="v" id="sB" style="color:var(--b)">—<small>/分</small></div><div class="s">直近 10 分の平均</div></div>
+      <div class="stat"><div class="k">高圧</div><div class="v" id="sHV">—<small>V</small></div><div class="s" id="sHVs">目標 —</div></div>
+      <div class="stat"><div class="k">電池</div><div class="v" id="sBat">—<small>V</small></div><div class="s" id="sBats">—</div></div>
+      <div class="stat"><div class="k">偶然の一致</div><div class="v" id="sD">—<small>回</small></div><div class="s">1 ms ずらした同時（今日）</div></div>
     </div>
   </div>
 
-  <div class="panel"><h2>基板からのメッセージ</h2><ul id="msgs"></ul></div>
-</main>
+  <div class="side">
+    <div class="tabs">
+      <div class="tabbar">
+        <button data-tab="rec" class="on">記録</button>
+        <button data-tab="stars">時刻</button>
+        <button data-tab="power">電源</button>
+        <span class="sep"></span>
+        <button data-tab="set">設定</button>
+        <button data-tab="exp">実験</button>
+        <button data-tab="log">ログ</button>
+      </div>
 
+      <div class="pane on" id="tab-rec">
+        <h3>宇宙線の数<div class="seg" id="range"><button data-h="0.1667" class="on">10 分</button><button data-h="3">3 時間</button><button data-h="24">24 時間</button><button data-h="168">7 日</button></div></h3>
+        <div class="grow"><canvas id="cChart"></canvas></div>
+        <h3>管ごとの数（毎分に換算）<span id="abNote" style="margin-left:auto;color:var(--dim)"></span></h3>
+        <div class="grow"><canvas id="abChart"></canvas></div>
+      </div>
+
+      <div class="pane" id="tab-stars">
+        <h3>宇宙線が降った時刻</h3>
+        <ul id="events"></ul>
+      </div>
+
+      <div class="pane" id="tab-power">
+        <h3>高圧と電池</h3>
+        <div class="grow"><canvas id="pwChart"></canvas></div>
+        <div class="note">高圧は管にかけている電圧（目標 360 V 前後）。電池は単三・単四 2 本で約 3 V、2.2 V を切ったら交換の目安です。USB だけでつないでいるときは電池の線は出ません。</div>
+      </div>
+
+      <div class="pane" id="tab-set">
+        <div class="field set"><label>高圧<small>管にかける電圧（0 で停止）</small></label><input id="iHv" type="number" min="0" max="450" step="5"><span class="unit">V</span><button data-set="hv">反映</button></div>
+        <div class="field set"><label>同時の幅<small>2 本の反応をひとつとみなす時間</small></label><input id="iWin" type="number" min="5" max="5000" step="5"><span class="unit">µs</span><button data-set="win">反映</button></div>
+        <div class="field set"><label>放射線モードで光る長さ</label><input id="iFlash" type="number" min="0" max="200" step="5"><span class="unit">ms</span><button data-set="flash">反映</button></div>
+        <div class="field set"><label>高圧のオン時間<small>×50 ns。0 で連続駆動</small></label><input id="iHvon" type="number" min="0" max="300" step="10"><span class="unit"></span><button data-set="hvon">反映</button></div>
+        <div class="field set"><label>ログの間隔</label><input id="iLog" type="number" min="1" max="3600" step="1"><span class="unit">秒</span><button data-set="log">反映</button></div>
+        <div class="row-btns"><button id="save" class="primary">基板に保存</button><button id="hvOff">高圧を止める</button><button id="kick">LED を光らせてみる</button></div>
+        <div class="note">「基板に保存」を押すと、次に電源を入れたときもこの設定で動きます。</div>
+      </div>
+
+      <div class="pane" id="tab-exp">
+        <h3>プラトー測定</h3>
+        <div class="note" style="margin-top:-4px">電圧を変えながら管ごとの数を測り、使う電圧を決める</div>
+        <div class="row-btns">
+          <input id="swFrom" type="number" value="330" style="width:64px"> –
+          <input id="swTo" type="number" value="440" style="width:64px"> V
+          <input id="swStep" type="number" value="10" style="width:52px"> V 刻み
+          <input id="swSec" type="number" value="60" style="width:56px"> 秒
+          <button id="swGo">開始</button>
+        </div>
+        <div class="chartbox" style="display:none" id="swBox"><canvas id="swChart"></canvas></div>
+        <h3 style="margin-top:8px">時間差の分布<button id="dtGo" style="margin-left:auto">記録する</button></h3>
+        <div class="note" style="margin-top:-4px">2 本の反応の時間差（5 ms 以内）</div>
+        <div class="chartbox" style="display:none" id="dtBox"><canvas id="dtChart"></canvas></div>
+        <div class="note" id="dtNote"></div>
+      </div>
+
+      <div class="pane" id="tab-log">      <div class="pane" id="tab-log">
+        <h3>基板からのメッセージ<a class="gh" style="margin-left:auto;font-size:11px" href="https://github.com/monoradio102/stardust-lamp">GitHub</a></h3>
+        <ul id="msgs"></ul>
+      </div>
+    </div>
+  <div class="data">
+    <div class="col">
+      <div class="head"><span class="label">記録データ</span><span class="sub" id="logSub">10 秒ごと</span>
+        <span style="flex:1"></span>
+        <button id="csv" class="link" title="1 分ごとにまとめた記録（14 日分）を CSV で保存">CSV</button>
+        <button id="wake" class="link" title="画面を消さない。一晩記録するときは、ページを開いたままこれを押しておく">画面 ON</button>
+        <button id="clear" class="link" title="記録はこのブラウザにだけ残っています。どこにも送られません">消去</button></div>
+      <div class="scroll"><table class="log mono">
+        <thead><tr><th>時刻</th><th>高圧 V</th><th>駆動 %</th><th>A</th><th>B</th><th>C</th><th>D</th><th>電池 V</th></tr></thead>
+        <tbody id="logBody"><tr><td colspan="8" class="empty">基板をつなぐと、ここに 1 行ずつ記録が並びます</td></tr></tbody>
+      </table></div>
+    </div>
+    <div class="col">
+      <div class="head"><span class="label">イベント</span></div>
+      <div class="scroll"><ul id="feed" class="mono"></ul></div>
+    </div>
+  </div>
+  </div>
+</div>
+</div>
+
+<div id="toast"></div>
 <script>
 const $ = id => document.getElementById(id);
 const FIELDS = ["t_s", "hv_V", "on", "A", "B", "C", "D", "vbat_V", "mode"];
-const STORE = "stardust.records", KEEP = 20000;  // about two days at a 10 s log, kept in this browser
-let records = [], status = {}, lastSeen = 0;
-try { records = JSON.parse(localStorage.getItem(STORE) || "[]"); } catch (e) { records = []; }
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-const fmtTime = t => new Date(t * 1000).toLocaleTimeString("ja-JP", {hour: "2-digit", minute: "2-digit", second: "2-digit"});
-const fmtHM = t => new Date(t * 1000).toLocaleTimeString("ja-JP", {hour: "2-digit", minute: "2-digit"});
-
-function bin(seconds, key) {
-  const out = new Map();
-  for (const r of records) {
-    const b = Math.floor(r.time / seconds) * seconds;
-    out.set(b, (out.get(b) || 0) + r[key]);
+// ---------------- storage: one row per minute, 14 days ----------------
+// minute row: [t (minute start, s), A, B, C, D, hvSum, hvN, vbat, duty or on, mode]
+const KEY_MIN = "stardust.v2.minutes", KEY_STARS = "stardust.v2.stars";
+const KEEP_MIN = 14 * 24 * 60;
+let minutes = [], stars = [], recent = [], status = {}, lastSeen = 0, evLive = false;
+function load(k, d) { try { return JSON.parse(localStorage.getItem(k)) || d; } catch (e) { return d; } }
+minutes = load(KEY_MIN, []);
+stars = load(KEY_STARS, []);  // times (s) of coincidences
+(function migrate() {  // records kept by the first version of this page
+  const old = load("stardust.records", null);
+  if (!old || minutes.length) return;
+  for (const r of old) addToMinute(r);
+  try { localStorage.removeItem("stardust.records"); } catch (e) {}
+})();
+let saveTimer = null;
+function persist() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    if (minutes.length > KEEP_MIN) minutes.splice(0, minutes.length - KEEP_MIN);
+    const cut = Date.now() / 1000 - 3 * 86400;
+    stars = stars.filter(t => t > cut);
+    try { localStorage.setItem(KEY_MIN, JSON.stringify(minutes)); localStorage.setItem(KEY_STARS, JSON.stringify(stars)); } catch (e) {}
+  }, 1500);
+}
+function addToMinute(r) {
+  const t = Math.floor(r.time / 60) * 60;
+  let m = minutes[minutes.length - 1];
+  if (!m || m[0] !== t) {
+    if (m && m[0] > t) return;  // out of order: drop
+    m = [t, 0, 0, 0, 0, 0, 0, 0, 0, ""];
+    minutes.push(m);
   }
-  return out;
+  m[1] += r.A; m[2] += r.B; m[3] += r.C; m[4] += r.D;
+  if (r.hv_V > 0) { m[5] += r.hv_V; m[6]++; }
+  m[7] = r.vbat_V; m[8] = r.on; m[9] = r.mode;
 }
 
-const grid = { color: "#26324f" }, ticks = { color: "#8e9ab5" };
-const cpmChart = new Chart($("cpmChart"), {
-  type: "line",
-  data: { datasets: [
-    { label: "管 A", borderColor: "#7fb3ff", backgroundColor: "#7fb3ff", data: [], pointRadius: 0, tension: .3 },
-    { label: "管 B", borderColor: "#ffb36b", backgroundColor: "#ffb36b", data: [], pointRadius: 0, tension: .3 } ] },
-  options: { animation: false, maintainAspectRatio: false, parsing: false,
-    scales: { x: { type: "linear", grid, ticks: { ...ticks, callback: v => fmtHM(v), maxTicksLimit: 8 } },
-              y: { beginAtZero: true, grid, ticks } },
-    plugins: { legend: { labels: { color: "#e8ecf5" } } } }
-});
-const coChart = new Chart($("coChart"), {
-  type: "bar",
-  data: { datasets: [
-    { label: "2 本同時", backgroundColor: "#fff3c4", data: [] },
-    { label: "1 ms ずらした同時（偶然の目安）", backgroundColor: "#6b7590", data: [] } ] },
-  options: { animation: false, maintainAspectRatio: false, parsing: false,
-    scales: { x: { type: "linear", offset: true, grid, ticks: { ...ticks, callback: v => fmtHM(v), maxTicksLimit: 8 } },
-              y: { beginAtZero: true, grid, ticks: { ...ticks, precision: 0 } } },
-    plugins: { legend: { labels: { color: "#e8ecf5" } } } }
-});
+// ---------------- time helpers ----------------
+const pad = n => String(n).padStart(2, "0");
+const fmtHMS = t => { const d = new Date(t * 1000); return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
+const fmtHM = t => { const d = new Date(t * 1000); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const fmtDHM = t => { const d = new Date(t * 1000); return `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const midnight = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime() / 1000; };
 
-function render() {
+// ---------------- the sky ----------------
+const sky = $("sky"), g = sky.getContext("2d");
+let W = 0, H = 0, DPR = 1, bg = [];
+const hit = { A: -1e9, B: -1e9 }, tracks = [], blooms = [];
+function resize() {
+  DPR = Math.min(2, devicePixelRatio || 1);
+  W = sky.clientWidth; H = sky.clientHeight;
+  sky.width = W * DPR; sky.height = H * DPR;
+  g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const n = Math.round(W * H / 5200);
+  bg = Array.from({ length: n }, () => ({ x: Math.random() * W, y: Math.random() * H,
+    r: Math.random() ** 3 * .8 + .3, a: Math.random() * .22 + .05, p: Math.random() * 6.28, s: .2 + Math.random() * .5 }));
+}
+new ResizeObserver(resize).observe(sky);
+resize();
+
+function geom() {
+  const tw = Math.min(430, W * .62), th = Math.max(30, Math.min(56, H * .15)), gap = th * .8;
+  const cx = W / 2, cy = H / 2;
+  return { tw, th, gap, x0: cx - tw / 2, yA: cy - gap / 2 - th, yB: cy + gap / 2, cx, cy };
+}
+// a star's place in the sky comes from its time, so the same night looks the same after a reload
+function starPos(t) {
+  let h = Math.floor(t * 1000) >>> 0;
+  const rnd = () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 10000) / 10000; };
+  rnd(); rnd();
+  const G = geom();
+  let x = .05 + rnd() * .9, y = .08 + rnd() * .84;
+  const py = y * H;
+  if (py > G.yA - 30 && py < G.yB + G.th + 30) y = rnd() < .5 ? (G.yA - 40 - rnd() * (G.yA - 60)) / H : (G.yB + G.th + 40 + rnd() * (H - G.yB - G.th - 60)) / H;
+  return { x, y, r: .9 + rnd() * 1.3, p: rnd() * 6.28 };
+}
+let starCache = new Map();
+function starOf(t) { if (!starCache.has(t)) starCache.set(t, starPos(t)); return starCache.get(t); }
+new ResizeObserver(() => starCache.clear()).observe(sky);
+
+function glowDot(x, y, r, color, a) {
+  const gr = g.createRadialGradient(x, y, 0, x, y, r * 6);
+  gr.addColorStop(0, color.replace("A", a)); gr.addColorStop(.25, color.replace("A", a * .35)); gr.addColorStop(1, color.replace("A", 0));
+  g.fillStyle = gr; g.beginPath(); g.arc(x, y, r * 6, 0, 6.283); g.fill();
+}
+
+// A GM tube as a line drawing: a glass envelope with domed ends (double line for the wall), the cathode
+// sleeve inside, the anode wire down the middle, and the two leads leaving the tips. A hit fills the gas with
+// the tube's color and lights the electrodes.
+// sky colors, swapped by applyTheme()
+const SKIES = {
+  dark: { ink: "rgba(238,236,232,", a: "169,188,205", b: "207,183,157", trail: "255,255,255", bloom: "255,250,240", bloomK: 1, label: "rgba(200,200,205,.9)" },
+  light: { ink: "rgba(17,17,17,", a: "47,95,138", b: "163,96,42", trail: "17,17,17", bloom: "47,95,138", bloomK: .5, label: "rgba(60,60,64,.9)" } };
+let SKY = SKIES.dark, INK = SKY.ink;
+function drawTube(y, G, key, rgb, now) {
+  const k = Math.max(0, 1 - (now - hit[key]) / 900), e = k * k;
+  const h = G.th, r = h / 2, cy = y + h / 2, L = h * 1.1;
+  const x0 = G.x0 + L, x1 = G.x0 + G.tw - L;          // glass tips
+  const lit = a => e > 0 ? `rgba(${rgb},${a + (1 - a) * e})` : INK + a + ")";
+  g.lineJoin = "round"; g.lineCap = "round";
+  // gas glow
+  if (e > 0) {
+    g.save(); g.shadowColor = `rgba(${rgb},${.8 * e})`; g.shadowBlur = 36 * e;
+    g.fillStyle = `rgba(${rgb},${.30 * e})`; roundRect(x0 + 3, y + 3, x1 - x0 - 6, h - 6, r - 3); g.fill(); g.restore();
+  }
+  // glass: outer and inner wall, a reflection along the top
+  g.strokeStyle = INK + ".72)"; g.lineWidth = 1.4; roundRect(x0, y, x1 - x0, h, r); g.stroke();
+  g.strokeStyle = INK + ".20)"; g.lineWidth = 1; roundRect(x0 + 3.5, y + 3.5, x1 - x0 - 7, h - 7, r - 3.5); g.stroke();
+  g.strokeStyle = INK + ".55)"; g.lineWidth = 1.4;
+  g.beginPath(); g.moveTo(x0 + r * 1.1, y + h * .2); g.lineTo(x0 + (x1 - x0) * .36, y + h * .2); g.stroke();
+  g.strokeStyle = INK + ".30)";
+  g.beginPath(); g.moveTo(x0 + (x1 - x0) * .40, y + h * .2); g.lineTo(x0 + (x1 - x0) * .44, y + h * .2); g.stroke();
+  // cathode sleeve, tied to the left tip
+  const sx0 = x0 + r * 1.2, sx1 = x1 - r * 1.6, sy0 = y + h * .32, sy1 = y + h * .68;
+  g.strokeStyle = lit(.30); g.lineWidth = 1;
+  g.strokeRect(sx0, sy0, sx1 - sx0, sy1 - sy0);
+  g.beginPath(); g.moveTo(x0, cy); g.lineTo(sx0, cy); g.stroke();
+  // anode wire, from a bead inside the sleeve out through the right tip
+  g.strokeStyle = lit(.75); g.lineWidth = e > 0 ? 1.2 + e : 1.2;
+  g.beginPath(); g.moveTo(sx0 + h * .25, cy); g.lineTo(x1, cy); g.stroke();
+  g.fillStyle = e > 0 ? `rgb(${rgb})` : INK + ".9)";
+  g.beginPath(); g.arc(sx0 + h * .25, cy, 2.2, 0, 6.283); g.fill();
+  // leads: straight out of the tips, ending in a small ring
+  g.strokeStyle = INK + ".72)"; g.lineWidth = 1.4;
+  for (const [tx, dir] of [[x0, -1], [x1, 1]]) {
+    const ex = tx + dir * (L * .8);
+    g.beginPath(); g.moveTo(tx, cy); g.lineTo(ex, cy); g.stroke();
+    g.beginPath(); g.arc(ex + dir * 3, cy, 3, 0, 6.283); g.stroke();
+  }
+}
+function roundRect(x, y, w, h, r) {
+  g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+}
+
+const TRACK_MS = 520;
+function launchTrack(t) {
+  const G = geom();
+  const xm = G.x0 + G.tw * (.18 + Math.random() * .64);
+  const slope = (Math.random() - .5) * .35;  // dx per dy, near vertical
+  tracks.push({ start: performance.now(), xm, slope, t, crossedA: false, crossedB: false });
+}
+
+function frame(now) {
+  g.clearRect(0, 0, W, H);
+  const G = geom();
+  for (const s of []) {
+    const a = reduceMotion ? s.a : s.a * (.7 + .3 * Math.sin(now / 1000 * s.s + s.p));
+    g.fillStyle = `rgba(255,255,255,${a})`; g.beginPath(); g.arc(s.x, s.y, s.r, 0, 6.283); g.fill();
+  }
+  // lamp bloom
+  for (let i = blooms.length - 1; i >= 0; i--) {
+    const k = 1 - (now - blooms[i]) / 2600;
+    if (k <= 0) { blooms.splice(i, 1); continue; }
+    const e = k * k;
+    const gr = g.createRadialGradient(G.cx, G.cy, 0, G.cx, G.cy, Math.max(W, H) * .55);
+    gr.addColorStop(0, `rgba(${SKY.bloom},${.10 * e * SKY.bloomK})`); gr.addColorStop(.4, `rgba(${SKY.bloom},${.03 * e * SKY.bloomK})`); gr.addColorStop(1, `rgba(${SKY.bloom},0)`);
+    g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  }
+  // today's stardust: one star per coincidence
+  const m0 = midnight();
+  for (const t of []) {
+    const s = starOf(t);
+    const born = bornAt.get(t);
+    let pop = 1;
+    if (born !== undefined) { const u = (now - born) / 1200; if (u < 0) continue; pop = u < 1 ? 1 + 2 * (1 - u) ** 3 : 1; }
+    const tw = reduceMotion ? 1 : .85 + .15 * Math.sin(now / 2400 + s.p);
+    glowDot(s.x * W, s.y * H, s.r * .6 * pop, "rgba(255,255,255,A)", .22 * tw);
+    g.fillStyle = `rgba(255,255,255,${.9 * tw})`; g.beginPath(); g.arc(s.x * W, s.y * H, s.r * .55 * pop, 0, 6.283); g.fill();
+  }
+  // tubes
+  drawTube(G.yA, G, "A", SKY.a, now);
+  drawTube(G.yB, G, "B", SKY.b, now);
+  g.font = `300 ${Math.round(Math.max(16, Math.min(22, G.th * .45)))}px Inter, system-ui, sans-serif`;
+  g.fillStyle = SKY.label; g.textAlign = "right"; g.textBaseline = "middle";
+  g.fillText("A", G.x0 - 14, G.yA + G.th / 2); g.fillText("B", G.x0 - 14, G.yB + G.th / 2);
+  // muon tracks
+  for (let i = tracks.length - 1; i >= 0; i--) {
+    const tr = tracks[i], u = (now - tr.start) / TRACK_MS;
+    const total = H + 260, head = -130 + u * total;
+    const fade = Math.max(0, Math.min(1, 1 - (u - 1) * 2.5));
+    if (fade <= 0) { tracks.splice(i, 1); continue; }
+    const xAt = y => tr.xm + (y - G.cy) * tr.slope;
+    const tail = 210;
+    const gr = g.createLinearGradient(xAt(head - tail), head - tail, xAt(head), head);
+    gr.addColorStop(0, `rgba(${SKY.trail},0)`); gr.addColorStop(1, `rgba(${SKY.trail},${.9 * fade})`);
+    g.strokeStyle = gr; g.lineWidth = 1; g.lineCap = "round";
+    g.beginPath(); g.moveTo(xAt(head - tail), head - tail); g.lineTo(xAt(Math.min(head, H + 10)), Math.min(head, H + 10)); g.stroke();
+    if (head < H) glowDot(xAt(head), head, .9, `rgba(${SKY.trail},A)`, .7 * fade);
+    if (!tr.crossedA && head > G.yA + G.th / 2) { tr.crossedA = true; hit.A = now; }
+    if (!tr.crossedB && head > G.yB + G.th / 2) {
+      tr.crossedB = true; hit.B = now; blooms.push(now);
+      if (!stars.includes(tr.t)) { stars.push(tr.t); persist(); }
+      bornAt.set(tr.t, now + 250); updateHeroText();
+    }
+  }
+  requestAnimationFrame(frame);
+}
+const bornAt = new Map();
+requestAnimationFrame(frame);
+
+// incoming events. A and B wait a moment: if a coincidence follows, the track lights them as it passes.
+let pendingAB = [];
+// ---------------- data table and event feed ----------------
+const fmtMs = d => `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${String(d.getMilliseconds()).padStart(3, "0")}`;
+function addRow(r) {
+  const tb = $("logBody");
+  if (tb.querySelector(".empty")) tb.innerHTML = "";
+  const tr = document.createElement("tr");
+  tr.className = "new" + (r.C > 0 ? " hit" : "");
+  const duty = status.burst ? (r.on / 10).toFixed(1) : "—";
+  const vb = r.vbat_V > .5 ? r.vbat_V.toFixed(2) : "—";
+  tr.innerHTML = `<td>${fmtHMS(r.time)}</td><td>${r.hv_V.toFixed(1)}</td><td>${duty}</td><td class="a">${r.A}</td><td class="b">${r.B}</td>` +
+                 `<td class="c">${r.C}</td><td>${r.D}</td><td>${vb}</td>`;
+  tb.prepend(tr);
+  while (tb.children.length > 720) tb.lastChild.remove();  // two hours at 10 s
+  $("logSub").textContent = `${status.log_s || 10} 秒ごと・${tb.children.length} 行`;
+}
+function addFeed(kind) {
+  const li = document.createElement("li");
+  li.className = kind;
+  li.innerHTML = `<span>${fmtMs(new Date())}</span><b>${kind === "C" ? "A＋B" : kind}</b>`;
+  $("feed").prepend(li);
+  while ($("feed").children.length > 300) $("feed").lastChild.remove();
+}
+
+function onEvent(kind, t) {
+  if (kind === "C") { pendingAB.forEach(clearTimeout); pendingAB = []; launchTrack(t); return; }
+  pendingAB.push(setTimeout(() => { hit[kind] = performance.now(); }, 60));
+}
+
+// ---------------- demo when no board is connected ----------------
+let demoTimer = null;
+function demo(on) {
+  $("demo").style.display = on ? "block" : "none";
+  clearInterval(demoTimer);
+  if (!on) return;
+  demoTimer = setInterval(() => {
+    if (Math.random() < .035) onEvent("A"); if (Math.random() < .027) onEvent("B");
+    if (Math.random() < .006) { hit.A = hit.B = -1e9; launchDemoTrack(); }
+  }, 100);
+}
+function launchDemoTrack() {  // demo tracks do not leave stars behind
+  const G = geom();
+  tracks.push({ start: performance.now(), xm: G.x0 + G.tw * (.18 + Math.random() * .64), slope: (Math.random() - .5) * .35,
+                t: -1, crossedA: false, crossedB: true });
+  setTimeout(() => { hit.B = performance.now(); blooms.push(performance.now()); }, TRACK_MS * (geom().yB + 130) / (H + 260));
+}
+
+// ---------------- numbers ----------------
+function updateHeroText() {}
+const sum = (rs, k) => rs.reduce((s, r) => s + r[k], 0);
+function updateStats() {
   const now = Date.now() / 1000;
-  // per-minute counts; the newest minute is still filling, so it is left out
-  const curMin = Math.floor(now / 60) * 60;
-  const a = bin(60, "A"), b = bin(60, "B");
-  cpmChart.data.datasets[0].data = [...a].filter(([t]) => t < curMin).map(([t, v]) => ({ x: t, y: v }));
-  cpmChart.data.datasets[1].data = [...b].filter(([t]) => t < curMin).map(([t, v]) => ({ x: t, y: v }));
-  cpmChart.update();
-  const c10 = bin(600, "C"), d10 = bin(600, "D");
-  coChart.data.datasets[0].data = [...c10].map(([t, v]) => ({ x: t + 300, y: v }));
-  coChart.data.datasets[1].data = [...d10].map(([t, v]) => ({ x: t + 300, y: v }));
-  coChart.update();
-
-  const last10 = records.filter(r => r.time > now - 600);
-  const span = last10.length ? Math.min(600, now - last10[0].time + (status.log_s || 10)) : 0;
-  const sum = (rs, k) => rs.reduce((s, r) => s + r[k], 0);
-  $("cpmA").textContent = span ? (sum(last10, "A") * 60 / span).toFixed(1) : "—";
-  $("cpmB").textContent = span ? (sum(last10, "B") * 60 / span).toFixed(1) : "—";
-  const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
-  const today = records.filter(r => r.time * 1000 >= midnight.getTime());
-  const lastHour = records.filter(r => r.time > now - 3600);
-  const hourSpan = lastHour.length ? Math.min(3600, now - lastHour[0].time + (status.log_s || 10)) : 0;
-  $("cph").textContent = hourSpan ? (sum(lastHour, "C") * 3600 / hourSpan).toFixed(1) + " /時" : "—";
-  $("ctoday").textContent = `今日 ${sum(today, "C")} 回`;
-  $("dtoday").textContent = sum(today, "D") + " 回";
-
-  const ev = records.filter(r => r.C > 0).slice(-30).reverse();
-  $("events").innerHTML = ev.length ? ev.map(r =>
-    `<li><span class="t">${fmtTime(r.time)}</span><span>宇宙線の候補${r.C > 1 ? " ×" + r.C : ""}</span></li>`).join("")
-    : `<li><span class="t">まだありません</span></li>`;
+  recent = recent.filter(r => r.time > now - 3600);
+  const logS = status.log_s || 10;
+  const spanOf = (rs, lim) => rs.length ? Math.min(lim, now - rs[0].time + logS) : 0;
+  const r10 = recent.filter(r => r.time > now - 600), s10 = spanOf(r10, 600), s60 = spanOf(recent, 3600);
+  // a rate from a few seconds of data swings wildly: wait for 1 min (tubes) and 10 min (coincidences)
+  setV("sA", s10 >= 60 ? (sum(r10, "A") * 60 / s10).toFixed(1) : "—", "/分");
+  setV("sB", s10 >= 60 ? (sum(r10, "B") * 60 / s10).toFixed(1) : "—", "/分");
+  if (s60 >= 600) { setV("sC", (sum(recent, "C") * 3600 / s60).toFixed(0), "/時"); $("sCs").textContent = "2 本同時、直近 1 時間"; }
+  else { setV("sC", sum(recent, "C"), "回"); $("sCs").textContent = s60 ? `集計中（${Math.floor(s60 / 60)} 分）` : "2 本同時、直近 1 時間"; }
+  const m0 = midnight();
+  setV("sD", minutes.filter(m => m[0] >= m0).reduce((s, m) => s + m[4], 0), "回");
 }
-
+let toastTimer = null;
+function toast(text) {
+  $("toast").textContent = text; $("toast").classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => $("toast").classList.remove("show"), 2600);
+}
+const MODE_INFO = {
+  cosmic: ["宇宙線", "2 本同時のときだけ、ふわっと光る"],
+  rad: ["放射線", "1 本の反応ごとに、短く光る"],
+  digital: ["デジタル", "マイコンが同時を判定して光る"] };
+function setV(id, v, unit) { $(id).innerHTML = `${v}<small>${unit}</small>`; }
 function showStatus() {
-  if (status.hv_now !== undefined) $("hv").textContent = status.hv_now.toFixed(0) + " V";
-  if (status.hv_target !== undefined) $("hvt").textContent = status.hv_target ? `目標 ${status.hv_target} V` : "止めています";
-  if (status.mode) {
-    $("mode").textContent = status.mode;
-    document.querySelectorAll("[data-mode]").forEach(b => b.classList.toggle("on", b.dataset.mode === status.mode));
+  if (status.hv_now !== undefined) setV("sHV", status.hv_now.toFixed(0), "V");
+  let s = status.hv_target === undefined ? "目標 —" : status.hv_target ? `目標 ${status.hv_target} V` : "止めています";
+  if (status.burst) s += status.duty !== undefined ? `　駆動 ${(status.duty / 10).toFixed(1)}%` : "";
+  $("sHVs").textContent = s;
+  if (status.vbat !== undefined) {
+    const usb = status.vbat < 0.5;
+    setV("sBat", usb ? "—" : status.vbat.toFixed(2), usb ? "" : "V");
+    $("sBats").textContent = usb ? "電池なし（USB から給電）" : status.vbat < 2.2 ? "そろそろ交換" : "電池あり";
   }
-  if (status.win_us) $("win").textContent = `時間窓 ${status.win_us} µs`;
+  document.querySelectorAll("[data-mode]").forEach(b => b.classList.toggle("on", b.dataset.mode === status.mode));
+
   const f = status.fault && status.fault !== "none";
   $("fault").style.display = f ? "block" : "none";
-  if (f) $("fault").textContent = "高圧が止まりました: " + status.fault;
+  if (f) $("fault").textContent = "高圧が止まりました: " + status.fault + "　原因を確かめてから、高圧を設定し直してください。";
+}
+function fillInputs() {  // put the board's values into the boxes, unless the person is typing in one
+  const set = (id, v) => { if (v !== undefined && document.activeElement !== $(id)) $(id).value = v; };
+  set("iHv", status.hv_target); set("iWin", status.win_us); set("iFlash", status.flash_ms);
+  set("iHvon", status.burst !== undefined ? status.burst : 0); set("iLog", status.log_s);
 }
 
-function addMsg(m) {
-  const li = document.createElement("li");
-  li.textContent = `${fmtTime(m.time)}  ${m.text}`;
-  $("msgs").prepend(li);
-  while ($("msgs").children.length > 100) $("msgs").lastChild.remove();
+// ---------------- charts ----------------
+Chart.defaults.font.family = 'Inter, "Noto Sans JP", system-ui, sans-serif';
+Chart.defaults.font.size = 12;
+Chart.defaults.font.weight = 400;
+Chart.defaults.color = "#9a9ba0";
+const grid = { color: "rgba(255,255,255,.045)", drawTicks: false }, border = { display: false };
+const THEMES = {
+  dark: { tick: "#9a9ba0", grid: "rgba(255,255,255,.045)", legend: "#b0b0b5", bar: "rgba(232,230,225,.75)", bar2: "rgba(232,230,225,.18)",
+          a: "#a9bccd", b: "#cfb79d", hv: "#e8e6e1", bat: "#9cc5a1" },
+  light: { tick: "#5a5a5e", grid: "rgba(0,0,0,.07)", legend: "#4a4a4d", bar: "rgba(17,17,17,.85)", bar2: "rgba(17,17,17,.15)",
+           a: "#2f5f8a", b: "#a3602a", hv: "#111111", bat: "#2e7d32" } };
+
+let rangeH = 1 / 6;
+const xAxis = () => ({ type: "linear", grid, border, ticks: { maxTicksLimit: 7, callback: v => rangeH > 24 ? fmtDHM(v) : rangeH < 1 ? fmtHMS(v) : fmtHM(v) } });
+const legend = { align: "end", labels: { boxWidth: 14, boxHeight: 2, color: "#b0b0b5", padding: 10 } };
+const cChart = new Chart($("cChart"), { type: "bar",
+  data: { datasets: [
+    { label: "2 本同時（宇宙線）", backgroundColor: "rgba(232,230,225,.75)", borderRadius: 0, barPercentage: .5, categoryPercentage: 1, data: [] },
+    { label: "1 ms ずらした同時（偶然の目安）", backgroundColor: "rgba(232,230,225,.18)", borderRadius: 0, barPercentage: .5, categoryPercentage: 1, data: [] } ] },
+  options: { animation: false, maintainAspectRatio: false, parsing: false,
+    scales: { x: { ...xAxis(), offset: true }, y: { beginAtZero: true, grid, border, ticks: { precision: 0 } } },
+    plugins: { legend } } });
+const abChart = new Chart($("abChart"), { type: "line",
+  data: { datasets: [
+    { label: "管 A", borderColor: "#a9bccd", backgroundColor: "#a9bccd", data: [], pointRadius: 0, borderWidth: 1, tension: .35 },
+    { label: "管 B", borderColor: "#cfb79d", backgroundColor: "#cfb79d", data: [], pointRadius: 0, borderWidth: 1, tension: .35 } ] },
+  options: { animation: false, maintainAspectRatio: false, parsing: false,
+    scales: { x: xAxis(), y: { beginAtZero: true, grid, border } }, plugins: { legend } } });
+const pwChart = new Chart($("pwChart"), { type: "line",
+  data: { datasets: [
+    { label: "高圧 (V)", yAxisID: "y", borderColor: "#e8e6e1", backgroundColor: "#e8e6e1", data: [], pointRadius: 0, borderWidth: 1 },
+    { label: "電池 (V)", yAxisID: "y2", borderColor: "#9cc5a1", backgroundColor: "#9cc5a1", data: [], pointRadius: 0, borderWidth: 1 } ] },
+  options: { animation: false, maintainAspectRatio: false, parsing: false,
+    scales: { x: xAxis(), y: { grid, border, suggestedMin: 300, suggestedMax: 420 },
+              y2: { position: "right", grid: { display: false }, border, suggestedMin: 0, suggestedMax: 5 } },
+    plugins: { legend } } });
+
+function renderCharts() {
+  const now = Date.now() / 1000, from = now - rangeH * 3600;
+  if (rangeH < 1) return renderLive(now, from);
+  const ms = minutes.filter(m => m[0] >= from);
+  // coincidences: 10 min bars for 3 h, 1 h for a day, 6 h for a week
+  const cb = rangeH <= 3 ? 600 : rangeH <= 24 ? 3600 : 6 * 3600;
+  const bc = new Map(), bd = new Map();
+  for (const m of ms) { const b = Math.floor(m[0] / cb) * cb; bc.set(b, (bc.get(b) || 0) + m[3]); bd.set(b, (bd.get(b) || 0) + m[4]); }
+  cChart.data.datasets[0].data = [...bc].map(([t, v]) => ({ x: t + cb / 2, y: v }));
+  cChart.data.datasets[1].data = [...bd].map(([t, v]) => ({ x: t + cb / 2, y: v }));
+  // per-minute counts and power: averaged over 1 min / 10 min / 1 h
+  const lb = rangeH <= 3 ? 300 : rangeH <= 24 ? 900 : 3600;
+  const acc = new Map();
+  const curMin = Math.floor(now / 60) * 60;
+  for (const m of ms) {
+    if (m[0] >= curMin) continue;  // the newest minute is still filling
+    const b = Math.floor(m[0] / lb) * lb;
+    const a = acc.get(b) || { n: 0, A: 0, B: 0, hv: 0, hvn: 0, vb: 0, vbn: 0 };
+    a.n++; a.A += m[1]; a.B += m[2];
+    if (m[6]) { a.hv += m[5] / m[6]; a.hvn++; }
+    if (m[7] > .5) { a.vb += m[7]; a.vbn++; }
+    acc.set(b, a);
+  }
+  const pts = [...acc].map(([t, a]) => ({ t: t + lb / 2, ...a }));
+  abChart.data.datasets[0].data = pts.map(p => ({ x: p.t, y: p.A / p.n }));
+  abChart.data.datasets[1].data = pts.map(p => ({ x: p.t, y: p.B / p.n }));
+  pwChart.data.datasets[0].data = pts.filter(p => p.hvn).map(p => ({ x: p.t, y: p.hv / p.hvn }));
+  pwChart.data.datasets[1].data = pts.filter(p => p.vbn).map(p => ({ x: p.t, y: p.vb / p.vbn }));
+  abChart.data.datasets.forEach(d => d.pointRadius = 0);
+  for (const c of [cChart, abChart, pwChart]) { c.options.scales.x.min = from; c.options.scales.x.max = now; c.update(); }
+  renderEvents();
+}
+// last 10 minutes straight from the 10 s log lines, so a source brought near shows up at once
+function renderLive(now, from) {
+  const logS = status.log_s || 10, k = 60 / logS;
+  const rs = recent.filter(r => r.time >= from);
+  const bc = new Map(), bd = new Map();
+  for (const r of rs) { const b = Math.floor(r.time / 60) * 60; bc.set(b, (bc.get(b) || 0) + r.C); bd.set(b, (bd.get(b) || 0) + r.D); }
+  cChart.data.datasets[0].data = [...bc].map(([t, v]) => ({ x: t + 30, y: v }));
+  cChart.data.datasets[1].data = [...bd].map(([t, v]) => ({ x: t + 30, y: v }));
+  abChart.data.datasets[0].data = rs.map(r => ({ x: r.time - logS / 2, y: r.A * k }));
+  abChart.data.datasets[1].data = rs.map(r => ({ x: r.time - logS / 2, y: r.B * k }));
+  pwChart.data.datasets[0].data = rs.filter(r => r.hv_V > 0).map(r => ({ x: r.time, y: r.hv_V }));
+  pwChart.data.datasets[1].data = rs.filter(r => r.vbat_V > .5).map(r => ({ x: r.time, y: r.vbat_V }));
+  for (const c of [abChart]) { c.data.datasets.forEach(d => { d.stepped = false; d.pointRadius = 1.5; }); }
+  for (const c of [cChart, abChart, pwChart]) { c.options.scales.x.min = from; c.options.scales.x.max = now; c.update(); }
+  renderEvents();
+}
+function renderEvents() {
+  const ev = [...stars].sort((x, y) => x - y).slice(-60).reverse();
+  $("events").innerHTML = ev.length ? ev.map(t =>
+    `<li><span class="t">${fmtHMS(t)}</span><span>${t < midnight() ? fmtDHM(t).split(" ")[0] + "　" : ""}<span class="st">✦</span> 宇宙線</span></li>`).join("")
+    : `<li><span>まだ降ってきていません</span></li>`;
 }
 
-function seen() { lastSeen = Date.now(); }
-setInterval(() => {
-  const ok = Date.now() - lastSeen < ((status.log_s || 10) * 2 + 5) * 1000;
-  $("conn").classList.toggle("on", ok);
-  $("conn").textContent = ok ? "受信中" : port ? "基板からのデータが止まっています" : "未接続";
-}, 1000);
-
-
-// ---- Web Serial: the board's CH340 (USB 1a86:7523), 115200 baud, one log line per interval ----
-let port = null, writer = null;
-const sent = new Set();  // our own commands come back on the one-wire line; drop those lines
-
-async function send(c) {
-  if (!writer) { addMsg({ time: Date.now() / 1000, text: "基板につながっていません" }); return; }
-  sent.add(c);
-  await writer.write(new TextEncoder().encode(c + "\n"));
+function applyTheme(name) {
+  document.documentElement.dataset.theme = name;
+  SKY = SKIES[name]; INK = SKY.ink;
+  try { localStorage.setItem("stardust.theme", name); } catch (e) {}
+  const T = THEMES[name];
+  Chart.defaults.color = T.tick; grid.color = T.grid; legend.labels.color = T.legend;
+  const set = (c, i, col) => { c.data.datasets[i].borderColor = col; c.data.datasets[i].backgroundColor = col; };
+  cChart.data.datasets[0].backgroundColor = T.bar; cChart.data.datasets[1].backgroundColor = T.bar2;
+  dtChart.data.datasets[0].backgroundColor = T.bar;
+  for (const c of [abChart, swChart]) { set(c, 0, T.a); set(c, 1, T.b); }
+  set(pwChart, 0, T.hv); set(pwChart, 1, T.bat);
+  for (const c of [cChart, abChart, pwChart, swChart, dtChart]) {
+    for (const ax of Object.values(c.options.scales)) { if (ax.ticks) ax.ticks.color = T.tick; if (ax.title) ax.title.color = T.tick; if (ax.grid) ax.grid.color = T.grid; }
+    if (c.options.plugins.legend.labels) c.options.plugins.legend.labels.color = T.legend;
+    c.update();
+  }
 }
-async function cmd(c) { await send(c); if (c !== "status") setTimeout(() => send("status"), 200); }
+$("theme").onclick = () => applyTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light");
+
+document.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => {
+  document.querySelectorAll("[data-tab]").forEach(x => x.classList.toggle("on", x === b));
+  document.querySelectorAll(".pane").forEach(p => p.classList.toggle("on", p.id === "tab-" + b.dataset.tab));
+  // charts drawn while their tab was hidden have no size yet
+  for (const c of [cChart, abChart, pwChart, swChart, dtChart]) c.resize();
+});
+document.querySelectorAll("#range button").forEach(b => b.onclick = () => {
+  rangeH = +b.dataset.h;
+  document.querySelectorAll("#range button").forEach(x => x.classList.toggle("on", x === b));
+  renderCharts();
+});
+
+// experiments
+const swChart = new Chart($("swChart"), { type: "line",
+  data: { datasets: [
+    { label: "管 A", borderColor: "#a9bccd", backgroundColor: "#a9bccd", data: [], borderWidth: 1, pointRadius: 2 },
+    { label: "管 B", borderColor: "#cfb79d", backgroundColor: "#cfb79d", data: [], borderWidth: 1, pointRadius: 2 } ] },
+  options: { animation: false, maintainAspectRatio: false, parsing: false,
+    scales: { x: { type: "linear", grid, border, title: { display: true, text: "V" } }, y: { beginAtZero: true, grid, border, title: { display: true, text: "/分" } } },
+    plugins: { legend } } });
+const dtChart = new Chart($("dtChart"), { type: "bar",
+  data: { datasets: [{ label: "回数", backgroundColor: "rgba(232,230,225,.75)", data: [] }] },
+  options: { animation: false, maintainAspectRatio: false, parsing: false,
+    scales: { x: { type: "linear", grid, border, offset: true, title: { display: true, text: "B − A（µs）" } }, y: { beginAtZero: true, grid, border, ticks: { precision: 0 } } },
+    plugins: { legend: { display: false } } } });
+let sweeping = false, dtOn = false, dts = [];
+function renderDt() {
+  const bins = new Map(), w = 10;
+  for (const d of dts) { const b = Math.floor(d / w) * w; bins.set(b, (bins.get(b) || 0) + 1); }
+  dtChart.data.datasets[0].data = [...bins].map(([b, n]) => ({ x: b + w / 2, y: n }));
+  dtChart.update();
+  const within = dts.filter(d => Math.abs(d) <= (status.win_us || 100)).length;
+  $("dtNote").textContent = dts.length ? `${dts.length} 回。同時の幅（±${status.win_us || 100} µs）の内側 ${within} 回` : "2 本の反応の時間差がここに溜まっていきます。";
+}
+
+// ---------------- Web Serial: CH340 (1a86:7523), 115200 baud ----------------
+let port = null, writer = null, reader = null, evRetries = 0;
+const sent = new Set();  // our own commands come back on the one-wire line; drop those
+// RX and TX share one wire on the board: a command sent while the board is still answering the last one
+// collides with it and is lost. So commands go out one at a time, 350 ms apart.
+let queue = [], pumping = false;
+function send(c) {
+  if (!writer) { addMsg("基板につながっていません"); return; }
+  queue.push(c);
+  if (!pumping) pump();
+}
+async function pump() {
+  pumping = true;
+  while (queue.length && writer) {
+    const c = queue.shift();
+    sent.add(c);
+    if (c !== "status") addMsg("> " + c);
+    try { await writer.write(new TextEncoder().encode(c + "\n")); } catch (e) { break; }
+    await new Promise(r => setTimeout(r, 350));
+  }
+  pumping = false;
+}
+// commands from the buttons: the board answers with a status line, which confirms them on screen
+let awaiting = null;
+function cmd(c, label) { if (!writer) { toast("先に「基板につなぐ」を押してください"); return; } awaiting = label || null; send(c); if (c !== "status") send("status"); }
 
 function parseStatus(line) {
   const out = {};
@@ -218,46 +769,75 @@ function parseStatus(line) {
     const w = part.split(" ");
     if (part.startsWith("hv target")) out.hv_target = parseFloat(w[2]);
     else if (part.startsWith("now")) out.hv_now = parseFloat(w[1]);
+    else if (part.startsWith("burst")) out.burst = parseInt(w[1]);
+    else if (part.startsWith("on ")) { out.burst = 0; out.on = parseInt(w[1]); }
     else if (part.startsWith("mode")) out.mode = w[1];
     else if (part.startsWith("win")) out.win_us = parseInt(w[1]);
+    else if (part.startsWith("flash")) out.flash_ms = parseInt(w[1]);
     else if (part.startsWith("log")) out.log_s = parseInt(w[1]);
     else if (part.startsWith("fault")) out.fault = part.slice(6);
+    else if (part.startsWith("fw ")) out.fw = w[1];
   }
   return out;
 }
-
-let saveTimer = null;
-function persist() {
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    try { localStorage.setItem(STORE, JSON.stringify(records.slice(-KEEP))); } catch (e) {}
-  }, 1000);
+function addMsg(text) {
+  const li = document.createElement("li");
+  li.textContent = `${fmtHMS(Date.now() / 1000)}  ${text}`;
+  $("msgs").prepend(li);
+  while ($("msgs").children.length > 200) $("msgs").lastChild.remove();
 }
 
 function handleLine(line) {
   if (!line || sent.has(line)) return;
   const now = Date.now() / 1000;
-  seen();
-  if (line.startsWith("# hv target")) { Object.assign(status, parseStatus(line)); showStatus(); return; }
+  lastSeen = Date.now();
+  if (line.startsWith("e,")) {
+    evLive = true;
+    const k = line[2];
+    if ("ABC".includes(k)) addFeed(k);
+    if (k === "C") { onEvent("C", now); } else if (k === "A" || k === "B") onEvent(k, now);
+    return;
+  }
+  if (line.startsWith("dt,")) { dts.push(parseInt(line.slice(3))); renderDt(); return; }
+  if (line.startsWith("# hv target")) {
+    const st = parseStatus(line);
+    Object.assign(status, st); showStatus(); fillInputs();
+    // firmware before 1.4.0 does not report its version
+    $("fw").textContent = st.fw ? "fw " + st.fw : "fw 1.3 以前";
+    $("fw").title = st.fw ? "基板のファームのバージョン" : "反応の知らせ（ev）に対応していない古いファームです";
+    if (awaiting) { toast(awaiting); awaiting = null; }
+    return;
+  }
+  if (line.startsWith("# sweep:")) { sweeping = true; swChart.data.datasets.forEach(d => d.data = []); $("swBox").style.display = "block"; swChart.update(); setSweepUi(); }
+  if (line.startsWith("# sweep done")) { sweeping = false; setSweepUi(); setTimeout(() => send("status"), 300); }
   const parts = line.split(",");
+  if (sweeping && parts.length === 5 && !line.startsWith("#")) {
+    const [v, , , ca, cb] = parts.map(parseFloat);
+    swChart.data.datasets[0].data.push({ x: v, y: ca }); swChart.data.datasets[1].data.push({ x: v, y: cb }); swChart.update();
+    addMsg(line); return;
+  }
   if (parts.length === FIELDS.length && !line.startsWith("#")) {
     const r = { time: now };
     FIELDS.forEach((k, i) => r[k] = k === "mode" ? parts[i] : parseFloat(parts[i]));
-    if (FIELDS.slice(0, 8).some(k => Number.isNaN(r[k]))) { addMsg({ time: now, text: line }); return; }
-    records.push(r);
-    if (records.length > KEEP) records.splice(0, records.length - KEEP);
-    status.hv_now = r.hv_V; status.mode = r.mode;
-    if (r.C > 0) { $("star").classList.remove("flash"); void $("star").offsetWidth; $("star").classList.add("flash"); }
-    persist(); render(); showStatus();
+    if (FIELDS.slice(0, 8).some(k => Number.isNaN(r[k]))) { addMsg(line); return; }
+    recent.push(r); addToMinute(r); addRow(r);
+    status.hv_now = r.hv_V; status.mode = r.mode; status.vbat = r.vbat_V;
+    if (status.burst) status.duty = r.on;
+    if (!evLive && r.A + r.B > 0 && evRetries < 3) { evRetries++; send("ev on"); if (status.hv_target === undefined) send("status"); }
+    if (r.C > 0 && !evLive) {  // older firmware without "ev": place the stars inside the log interval
+      const span = status.log_s || 10;
+      for (let i = 0; i < r.C; i++) setTimeout(() => launchTrack(now - span + Math.random() * span), i * 900);
+    }
+    persist(); updateStats(); showStatus(); renderCharts();
     return;
   }
-  addMsg({ time: now, text: line });  // "#" notes, "!" warnings, sweep results
+  addMsg(line);  // "#" notes, "!" warnings
 }
 
 async function readLoop() {
   const decoder = new TextDecoderStream();
   const closed = port.readable.pipeTo(decoder.writable).catch(() => {});
-  const reader = decoder.readable.getReader();
+  reader = decoder.readable.getReader();
   let buf = "";
   try {
     while (true) {
@@ -268,50 +848,105 @@ async function readLoop() {
       while ((i = buf.indexOf("\n")) >= 0) { handleLine(buf.slice(0, i).trim()); buf = buf.slice(i + 1); }
     }
   } catch (e) {
-    addMsg({ time: Date.now() / 1000, text: "シリアルが切れました: " + e.message });
+    addMsg("シリアルが切れました: " + e.message);
   } finally {
-    reader.releaseLock();
+    reader.releaseLock(); reader = null;
     await closed;
-    writer = null; port = null;
+    try { writer.releaseLock(); } catch (e) {}
+    try { await port.close(); } catch (e) {}
+    writer = null; port = null; $("fw").textContent = ""; evLive = false; evRetries = 0; queue = [];
     $("connect").textContent = "基板につなぐ";
+    demo(true);
   }
 }
-
 async function connect() {
   try {
     port = await navigator.serial.requestPort({ filters: [{ usbVendorId: 0x1a86, usbProductId: 0x7523 }] });
     await port.open({ baudRate: 115200 });
     writer = port.writable.getWriter();
-    $("connect").textContent = "つながっています";
+    $("connect").textContent = "切断する";
+    demo(false);
     readLoop();
-    await send("log 10");
-    await send("status");
+    send("log 10"); send("ev on"); send("status");
   } catch (e) {
-    addMsg({ time: Date.now() / 1000, text: "つなげませんでした: " + e.message });
+    addMsg("つなげませんでした: " + e.message);
   }
 }
+setInterval(() => {
+  const ok = Date.now() - lastSeen < ((status.log_s || 10) * 2 + 5) * 1000;
+  $("conn").className = "pill" + (ok ? " on" : port ? " stale" : "");
+  $("conn").textContent = ok ? "受信中" : port ? "基板からのデータが止まっています" : "未接続";
+}, 1000);
 
-function downloadCsv() {
-  const rows = ["time," + FIELDS.join(",")].concat(records.map(r =>
-    new Date(r.time * 1000).toISOString() + "," + FIELDS.map(k => r[k]).join(",")));
+// ---------------- buttons ----------------
+const MODE_JP = { cosmic: "宇宙線", rad: "放射線", digital: "デジタル" };
+document.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => cmd("mode " + b.dataset.mode, `光り方を「${MODE_JP[b.dataset.mode]}」にしました`));
+const inputOf = { hv: "iHv", win: "iWin", flash: "iFlash", hvon: "iHvon", log: "iLog" };
+document.querySelectorAll("[data-set]").forEach(b => b.onclick = () => {
+  const v = $(inputOf[b.dataset.set]).value;
+  if (v === "" || isNaN(+v)) return;
+  cmd(`${b.dataset.set} ${Math.round(+v)}`, "反映しました");
+});
+$("hvOff").onclick = () => cmd("hv 0", "高圧を止めました");
+$("kick").onclick = () => cmd("kick 30", "LED を光らせました");
+$("save").onclick = () => cmd("save", "基板に保存しました");
+function setSweepUi() { $("swGo").disabled = sweeping; $("swGo").textContent = sweeping ? "測定中…" : "開始"; }
+$("swGo").onclick = () => {
+  const f = +$("swFrom").value, t = +$("swTo").value, s = +$("swStep").value, sec = +$("swSec").value;
+  if (!(f >= 0 && t <= 450 && t >= f && s > 0 && sec > 0)) { addMsg("プラトー測定の値を確かめてください"); return; }
+  const mins = Math.ceil((Math.floor((t - f) / s) + 1) * (sec + 5) / 60);
+  if (!confirm(`${f}〜${t} V を ${s} V ごとに ${sec} 秒ずつ測ります（約 ${mins} 分）。終わると高圧は ${t} V のままになります。始めますか？`)) return;
+  send(`sweep ${f} ${t} ${s} ${sec}`);
+};
+$("dtGo").onclick = () => {
+  dtOn = !dtOn;
+  send(dtOn ? "dt on" : "dt off");
+  $("dtGo").textContent = dtOn ? "止める" : "記録する";
+  $("dtBox").style.display = "block";
+  if (dtOn) dts = [];
+  renderDt();
+};
+$("connect").onclick = async () => {
+  if (!port) return connect();
+  send("ev off");
+  await new Promise(r => setTimeout(r, 450));
+  if (reader) try { await reader.cancel(); } catch (e) {}
+};
+$("csv").onclick = () => {
+  const head = "time,A,B,C,D,hv_V,vbat_V,on,mode";
+  const rows = minutes.map(m => [new Date(m[0] * 1000).toISOString(), m[1], m[2], m[3], m[4],
+    m[6] ? (m[5] / m[6]).toFixed(1) : "", m[7], m[8], m[9]].join(","));
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([rows.join("\n") + "\n"], { type: "text/csv" }));
+  a.href = URL.createObjectURL(new Blob([[head, ...rows].join("\n") + "\n"], { type: "text/csv" }));
   a.download = "stardust_" + new Date().toISOString().slice(0, 10) + ".csv";
   a.click();
+};
+$("clear").onclick = () => {
+  if (!confirm("このブラウザに残した記録と星屑を消しますか？")) return;
+  minutes = []; stars = []; recent = []; persist(); updateHeroText(); updateStats(); renderCharts();
+};
+let wakeLock = null, wantWake = false;
+async function holdWake() {
+  try { wakeLock = await navigator.wakeLock.request("screen"); wakeLock.addEventListener("release", () => { wakeLock = null; }); }
+  catch (e) { addMsg("画面をつけたままにできませんでした: " + e.message); wantWake = false; }
+  $("wake").textContent = wantWake ? "画面 ON ●" : "画面 ON";
+  $("wake").classList.toggle("primary", wantWake);
 }
-
-document.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => cmd("mode " + b.dataset.mode));
-$("hvSet").onclick = () => { const v = parseFloat($("hvIn").value); if (v >= 0 && v <= 450) cmd("hv " + v); };
-$("hvOff").onclick = () => cmd("hv 0");
-$("kick").onclick = () => cmd("kick 30");
-$("save").onclick = () => cmd("save");
-$("connect").onclick = connect;
-$("csv").onclick = downloadCsv;
-$("clear").onclick = () => { if (confirm("このブラウザに残した記録を消しますか？")) { records = []; persist(); render(); } };
+$("wake").onclick = async () => {
+  wantWake = !wantWake;
+  if (wantWake) holdWake();
+  else { if (wakeLock) await wakeLock.release(); $("wake").textContent = "画面 ON"; $("wake").classList.remove("primary"); }
+};
+// the lock is dropped whenever the tab is hidden; take it again when it comes back
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && wantWake && !wakeLock) holdWake(); });
 
 if (!("serial" in navigator)) { $("nosupport").style.display = "block"; $("connect").disabled = true; }
-render(); showStatus();
-setInterval(render, 30000);
+let savedTheme = "light";
+try { savedTheme = localStorage.getItem("stardust.theme") || "light"; } catch (e) {}
+applyTheme(savedTheme);
+demo(true);
+updateHeroText(); updateStats(); showStatus(); renderCharts(); renderDt();
+setInterval(() => { updateStats(); renderCharts(); updateHeroText(); }, 30000);
 </script>
 </body>
 </html>
