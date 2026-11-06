@@ -1,8 +1,9 @@
 <div align="center">
 
-# 星屑灯
-
-**STARDUST LAMP**
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="brand/hoshikuzu_stacked_cream.svg">
+  <img src="brand/hoshikuzu_stacked_ink.svg" width="340" alt="星屑灯 HOSHIKUZU-TŌ">
+</picture>
 
 宇宙から降ってきた粒子が 2 本の管を貫いたとき、ふわりと灯るランプ。
 
@@ -75,6 +76,7 @@ SW1 を **PROG** にして書き込み、**RUN** に戻してから使います�
 index.html              Web モニター（GitHub Pages）
 firmware/stardust/      ファームと変更履歴
 hardware/               回路図・基板の図・説明
+brand/                  ロゴ（SVG。文字もアウトライン化済み）とアイコン
 ```
 
 ## 安全のために
