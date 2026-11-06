@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>星屑灯 モニター</title>
+<meta name="description" content="星屑灯（2 本の GM 管で宇宙線を数えるランプ）の Web シリアル モニター">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0d1424; --panel: #16213a; --line: #26324f; --text: #e8ecf5; --muted: #8e9ab5;
+    --a: #7fb3ff; --b: #ffb36b; --c: #fff3c4; --d: #6b7590; --ok: #5fd38d; --warn: #ff7a7a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font-family: "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif; }
+  header { display: flex; align-items: baseline; gap: 16px; padding: 18px 24px 6px; flex-wrap: wrap; }
+  h1 { font-size: 22px; margin: 0; letter-spacing: .05em; }
+  #conn { font-size: 13px; color: var(--muted); }
+  #conn::before { content: "●"; margin-right: 6px; color: var(--warn); }
+  #conn.on::before { color: var(--ok); }
+  header button { margin-left: auto; }
+  header button ~ button { margin-left: 0; }
+  #fault { display: none; margin: 8px 24px 0; padding: 10px 14px; border-radius: 8px;
+           background: #4a1d26; color: #ffd0d6; font-size: 14px; }
+  main { padding: 12px 24px 32px; display: grid; gap: 16px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .card .label { font-size: 12px; color: var(--muted); }
+  .card .value { font-size: 28px; font-weight: 600; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .card .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .row { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+  @media (max-width: 900px) { .row { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .panel h2 { font-size: 14px; margin: 0 0 10px; color: var(--muted); font-weight: 500; }
+  .chart { position: relative; height: 240px; }
+  #events, #msgs { list-style: none; margin: 0; padding: 0; max-height: 240px; overflow-y: auto; font-size: 13px; }
+  #events li { padding: 6px 0; border-bottom: 1px solid var(--line); display: flex; gap: 10px; }
+  #events .t { color: var(--muted); font-variant-numeric: tabular-nums; }
+  #msgs li { padding: 3px 0; color: var(--muted); font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  button, input { font: inherit; font-size: 14px; border-radius: 8px; border: 1px solid var(--line);
+                  background: #1e2b4a; color: var(--text); padding: 8px 14px; }
+  button { cursor: pointer; }
+  button:hover { background: #26375f; }
+  button.on { background: #3a4f86; border-color: #6d86c9; }
+  input { width: 90px; }
+  .sep { width: 1px; height: 28px; background: var(--line); margin: 0 4px; }
+  #star { position: fixed; inset: 0; pointer-events: none; opacity: 0;
+          background: radial-gradient(circle at 50% 30%, rgba(255,243,196,.35), transparent 55%); }
+  #star.flash { animation: glow 3s ease-out; }
+  @keyframes glow { 0% { opacity: 1; } 100% { opacity: 0; } }
+</style>
+</head>
+<body>
+<div id="star"></div>
+<header>
+  <h1>星屑灯 v1</h1>
+  <span id="conn">つないでいません</span>
+  <button id="connect">基板につなぐ</button>
+  <button id="csv">CSV を保存</button>
+  <button id="clear">記録を消す</button>
+</header>
+<div id="nosupport" style="display:none;margin:8px 24px 0;padding:10px 14px;border-radius:8px;background:#3a3420;color:#ffe9a8;font-size:14px">
+  このブラウザは Web シリアルに対応していません。パソコンの Chrome か Edge で開いてください。</div>
+<div id="fault"></div>
+<main>
+  <section class="cards">
+    <div class="card"><div class="label">高圧</div><div class="value" id="hv">—</div><div class="sub" id="hvt">目標 —</div></div>
+    <div class="card"><div class="label">モード</div><div class="value" id="mode">—</div><div class="sub" id="win">時間窓 —</div></div>
+    <div class="card"><div class="label">管 A（毎分）</div><div class="value" id="cpmA" style="color:var(--a)">—</div><div class="sub">直近 10 分の平均</div></div>
+    <div class="card"><div class="label">管 B（毎分）</div><div class="value" id="cpmB" style="color:var(--b)">—</div><div class="sub">直近 10 分の平均</div></div>
+    <div class="card"><div class="label">宇宙線の候補（2 本同時）</div><div class="value" id="cph" style="color:var(--c)">—</div><div class="sub" id="ctoday">今日 —</div></div>
+    <div class="card"><div class="label">偶然の一致の目安</div><div class="value" id="dtoday">—</div><div class="sub">1 ms ずらした同時（今日）</div></div>
+  </section>
+
+  <div class="row">
+    <div class="panel"><h2>管ごとのカウント（毎分）</h2><div class="chart"><canvas id="cpmChart"></canvas></div></div>
+    <div class="panel"><h2>宇宙線の候補が来た時刻</h2><ul id="events"></ul></div>
+  </div>
+
+  <div class="panel"><h2>2 本同時の回数（10 分ごと）</h2><div class="chart"><canvas id="coChart"></canvas></div></div>
+
+  <div class="panel">
+    <h2>操作</h2>
+    <div class="controls">
+      <button data-mode="cosmic">cosmic</button>
+      <button data-mode="rad">rad</button>
+      <button data-mode="digital">digital</button>
+      <span class="sep"></span>
+      <input id="hvIn" type="number" min="0" max="450" step="5" placeholder="380"> V
+      <button id="hvSet">高圧を設定</button>
+      <button id="hvOff">高圧を止める</button>
+      <span class="sep"></span>
+      <button id="kick">LED を光らせる</button>
+      <button id="save">設定を保存</button>
+    </div>
+  </div>
+
+  <div class="panel"><h2>基板からのメッセージ</h2><ul id="msgs"></ul></div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const FIELDS = ["t_s", "hv_V", "on", "A", "B", "C", "D", "vbat_V", "mode"];
+const STORE = "stardust.records", KEEP = 20000;  // about two days at a 10 s log, kept in this browser
+let records = [], status = {}, lastSeen = 0;
+try { records = JSON.parse(localStorage.getItem(STORE) || "[]"); } catch (e) { records = []; }
+
+const fmtTime = t => new Date(t * 1000).toLocaleTimeString("ja-JP", {hour: "2-digit", minute: "2-digit", second: "2-digit"});
+const fmtHM = t => new Date(t * 1000).toLocaleTimeString("ja-JP", {hour: "2-digit", minute: "2-digit"});
+
+function bin(seconds, key) {
+  const out = new Map();
+  for (const r of records) {
+    const b = Math.floor(r.time / seconds) * seconds;
+    out.set(b, (out.get(b) || 0) + r[key]);
+  }
+  return out;
+}
+
+const grid = { color: "#26324f" }, ticks = { color: "#8e9ab5" };
+const cpmChart = new Chart($("cpmChart"), {
+  type: "line",
+  data: { datasets: [
+    { label: "管 A", borderColor: "#7fb3ff", backgroundColor: "#7fb3ff", data: [], pointRadius: 0, tension: .3 },
+    { label: "管 B", borderColor: "#ffb36b", backgroundColor: "#ffb36b", data: [], pointRadius: 0, tension: .3 } ] },
+  options: { animation: false, maintainAspectRatio: false, parsing: false,
+    scales: { x: { type: "linear", grid, ticks: { ...ticks, callback: v => fmtHM(v), maxTicksLimit: 8 } },
+              y: { beginAtZero: true, grid, ticks } },
+    plugins: { legend: { labels: { color: "#e8ecf5" } } } }
+});
+const coChart = new Chart($("coChart"), {
+  type: "bar",
+  data: { datasets: [
+    { label: "2 本同時", backgroundColor: "#fff3c4", data: [] },
+    { label: "1 ms ずらした同時（偶然の目安）", backgroundColor: "#6b7590", data: [] } ] },
+  options: { animation: false, maintainAspectRatio: false, parsing: false,
+    scales: { x: { type: "linear", offset: true, grid, ticks: { ...ticks, callback: v => fmtHM(v), maxTicksLimit: 8 } },
+              y: { beginAtZero: true, grid, ticks: { ...ticks, precision: 0 } } },
+    plugins: { legend: { labels: { color: "#e8ecf5" } } } }
+});
+
+function render() {
+  const now = Date.now() / 1000;
+  // per-minute counts; the newest minute is still filling, so it is left out
+  const curMin = Math.floor(now / 60) * 60;
+  const a = bin(60, "A"), b = bin(60, "B");
+  cpmChart.data.datasets[0].data = [...a].filter(([t]) => t < curMin).map(([t, v]) => ({ x: t, y: v }));
+  cpmChart.data.datasets[1].data = [...b].filter(([t]) => t < curMin).map(([t, v]) => ({ x: t, y: v }));
+  cpmChart.update();
+  const c10 = bin(600, "C"), d10 = bin(600, "D");
+  coChart.data.datasets[0].data = [...c10].map(([t, v]) => ({ x: t + 300, y: v }));
+  coChart.data.datasets[1].data = [...d10].map(([t, v]) => ({ x: t + 300, y: v }));
+  coChart.update();
+
+  const last10 = records.filter(r => r.time > now - 600);
+  const span = last10.length ? Math.min(600, now - last10[0].time + (status.log_s || 10)) : 0;
+  const sum = (rs, k) => rs.reduce((s, r) => s + r[k], 0);
+  $("cpmA").textContent = span ? (sum(last10, "A") * 60 / span).toFixed(1) : "—";
+  $("cpmB").textContent = span ? (sum(last10, "B") * 60 / span).toFixed(1) : "—";
+  const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+  const today = records.filter(r => r.time * 1000 >= midnight.getTime());
+  const lastHour = records.filter(r => r.time > now - 3600);
+  const hourSpan = lastHour.length ? Math.min(3600, now - lastHour[0].time + (status.log_s || 10)) : 0;
+  $("cph").textContent = hourSpan ? (sum(lastHour, "C") * 3600 / hourSpan).toFixed(1) + " /時" : "—";
+  $("ctoday").textContent = `今日 ${sum(today, "C")} 回`;
+  $("dtoday").textContent = sum(today, "D") + " 回";
+
+  const ev = records.filter(r => r.C > 0).slice(-30).reverse();
+  $("events").innerHTML = ev.length ? ev.map(r =>
+    `<li><span class="t">${fmtTime(r.time)}</span><span>宇宙線の候補${r.C > 1 ? " ×" + r.C : ""}</span></li>`).join("")
+    : `<li><span class="t">まだありません</span></li>`;
+}
+
+function showStatus() {
+  if (status.hv_now !== undefined) $("hv").textContent = status.hv_now.toFixed(0) + " V";
+  if (status.hv_target !== undefined) $("hvt").textContent = status.hv_target ? `目標 ${status.hv_target} V` : "止めています";
+  if (status.mode) {
+    $("mode").textContent = status.mode;
+    document.querySelectorAll("[data-mode]").forEach(b => b.classList.toggle("on", b.dataset.mode === status.mode));
+  }
+  if (status.win_us) $("win").textContent = `時間窓 ${status.win_us} µs`;
+  const f = status.fault && status.fault !== "none";
+  $("fault").style.display = f ? "block" : "none";
+  if (f) $("fault").textContent = "高圧が止まりました: " + status.fault;
+}
+
+function addMsg(m) {
+  const li = document.createElement("li");
+  li.textContent = `${fmtTime(m.time)}  ${m.text}`;
+  $("msgs").prepend(li);
+  while ($("msgs").children.length > 100) $("msgs").lastChild.remove();
+}
+
+function seen() { lastSeen = Date.now(); }
+setInterval(() => {
+  const ok = Date.now() - lastSeen < ((status.log_s || 10) * 2 + 5) * 1000;
+  $("conn").classList.toggle("on", ok);
+  $("conn").textContent = ok ? "受信中" : "基板からのデータが止まっています";
+}, 1000);
+
+
+// ---- Web Serial: the board's CH340 (USB 1a86:7523), 115200 baud, one log line per interval ----
+let port = null, writer = null;
+const sent = new Set();  // our own commands come back on the one-wire line; drop those lines
+
+async function send(c) {
+  if (!writer) { addMsg({ time: Date.now() / 1000, text: "基板につながっていません" }); return; }
+  sent.add(c);
+  await writer.write(new TextEncoder().encode(c + "\n"));
+}
+async function cmd(c) { await send(c); if (c !== "status") setTimeout(() => send("status"), 200); }
+
+function parseStatus(line) {
+  const out = {};
+  for (const part of line.slice(2).split(", ")) {
+    const w = part.split(" ");
+    if (part.startsWith("hv target")) out.hv_target = parseFloat(w[2]);
+    else if (part.startsWith("now")) out.hv_now = parseFloat(w[1]);
+    else if (part.startsWith("mode")) out.mode = w[1];
+    else if (part.startsWith("win")) out.win_us = parseInt(w[1]);
+    else if (part.startsWith("log")) out.log_s = parseInt(w[1]);
+    else if (part.startsWith("fault")) out.fault = part.slice(6);
+  }
+  return out;
+}
+
+let saveTimer = null;
+function persist() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try { localStorage.setItem(STORE, JSON.stringify(records.slice(-KEEP))); } catch (e) {}
+  }, 1000);
+}
+
+function handleLine(line) {
+  if (!line || sent.has(line)) return;
+  const now = Date.now() / 1000;
+  seen();
+  if (line.startsWith("# hv target")) { Object.assign(status, parseStatus(line)); showStatus(); return; }
+  const parts = line.split(",");
+  if (parts.length === FIELDS.length && !line.startsWith("#")) {
+    const r = { time: now };
+    FIELDS.forEach((k, i) => r[k] = k === "mode" ? parts[i] : parseFloat(parts[i]));
+    if (FIELDS.slice(0, 8).some(k => Number.isNaN(r[k]))) { addMsg({ time: now, text: line }); return; }
+    records.push(r);
+    if (records.length > KEEP) records.splice(0, records.length - KEEP);
+    status.hv_now = r.hv_V; status.mode = r.mode;
+    if (r.C > 0) { $("star").classList.remove("flash"); void $("star").offsetWidth; $("star").classList.add("flash"); }
+    persist(); render(); showStatus();
+    return;
+  }
+  addMsg({ time: now, text: line });  // "#" notes, "!" warnings, sweep results
+}
+
+async function readLoop() {
+  const decoder = new TextDecoderStream();
+  const closed = port.readable.pipeTo(decoder.writable).catch(() => {});
+  const reader = decoder.readable.getReader();
+  let buf = "";
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += value;
+      let i;
+      while ((i = buf.indexOf("\n")) >= 0) { handleLine(buf.slice(0, i).trim()); buf = buf.slice(i + 1); }
+    }
+  } catch (e) {
+    addMsg({ time: Date.now() / 1000, text: "シリアルが切れました: " + e.message });
+  } finally {
+    reader.releaseLock();
+    await closed;
+    writer = null; port = null;
+    $("connect").textContent = "基板につなぐ";
+  }
+}
+
+async function connect() {
+  try {
+    port = await navigator.serial.requestPort({ filters: [{ usbVendorId: 0x1a86, usbProductId: 0x7523 }] });
+    await port.open({ baudRate: 115200 });
+    writer = port.writable.getWriter();
+    $("connect").textContent = "つながっています";
+    readLoop();
+    await send("log 10");
+    await send("status");
+  } catch (e) {
+    addMsg({ time: Date.now() / 1000, text: "つなげませんでした: " + e.message });
+  }
+}
+
+function downloadCsv() {
+  const rows = ["time," + FIELDS.join(",")].concat(records.map(r =>
+    new Date(r.time * 1000).toISOString() + "," + FIELDS.map(k => r[k]).join(",")));
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([rows.join("\n") + "\n"], { type: "text/csv" }));
+  a.download = "stardust_" + new Date().toISOString().slice(0, 10) + ".csv";
+  a.click();
+}
+
+document.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => cmd("mode " + b.dataset.mode));
+$("hvSet").onclick = () => { const v = parseFloat($("hvIn").value); if (v >= 0 && v <= 450) cmd("hv " + v); };
+$("hvOff").onclick = () => cmd("hv 0");
+$("kick").onclick = () => cmd("kick 30");
+$("save").onclick = () => cmd("save");
+$("connect").onclick = connect;
+$("csv").onclick = downloadCsv;
+$("clear").onclick = () => { if (confirm("このブラウザに残した記録を消しますか？")) { records = []; persist(); render(); } };
+
+if (!("serial" in navigator)) { $("nosupport").style.display = "block"; $("connect").disabled = true; }
+render(); showStatus();
+setInterval(render, 30000);
+</script>
+</body>
+</html>
