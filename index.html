@@ -197,7 +197,7 @@ function seen() { lastSeen = Date.now(); }
 setInterval(() => {
   const ok = Date.now() - lastSeen < ((status.log_s || 10) * 2 + 5) * 1000;
   $("conn").classList.toggle("on", ok);
-  $("conn").textContent = ok ? "受信中" : "基板からのデータが止まっています";
+  $("conn").textContent = ok ? "受信中" : port ? "基板からのデータが止まっています" : "未接続";
 }, 1000);
 
 
