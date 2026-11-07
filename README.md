@@ -2,26 +2,57 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="brand/hoshikuzu_stacked_cream.svg">
-  <img src="brand/hoshikuzu_stacked_ink.svg" width="340" alt="星屑灯 HOSHIKUZU-TŌ">
+  <img src="brand/hoshikuzu_stacked_ink.svg" width="300" alt="星屑灯 HOSHIKUZU-TŌ">
 </picture>
 
-**銀河を旅する粒子を、灯りに変える**
+<br><br>
 
-[Web モニター](https://monoradio102.github.io/stardust-lamp/)　·　[回路と基板](hardware/)　·　[ファーム](firmware/stardust/)
+<h3>銀河を旅する粒子が、明かりを灯す</h3>
 
 <br>
 
-<img src="hardware/images/pcb_black.png" width="900" alt="星屑灯の基板（左が表、右が裏）">
+<img src="hardware/images/lamp.jpg" width="820" alt="星屑灯。上下に重ねた 2 本のガイガー管と、光った瞬間の基板">
+
+<br><br>
+
+<p>
+星がその一生を終えるとき、超新星爆発が起こります。<br>
+その衝撃波で光の速さ近くまで加速された粒子は、<br>
+銀河の磁場に導かれて、一千万年もの旅を続けます。
+</p>
+
+<p>✦</p>
+
+<p>
+地球の大気には、その粒子の雨が降り注いでいます。<br>
+上空 15 km で空気の原子核とぶつかり、<br>
+粒子は大気に溶けていきます。<br>
+そのとき生まれるのが、<br>
+ミューオンという小さな粒子です。<br>
+ミューオンは今も、あなたの手のひらを<br>
+毎秒ひとつずつ通り抜けています。
+</p>
+
+<p>✦</p>
+
+<p>
+このランプは、ミューオンがガイガー管に残す<br>
+かすかな痕跡を増幅して、ふわりと灯ります。<br>
+1 分に 2 回ほど。<br>
+<b>銀河を巡った旅の、最後のしるしです。</b>
+</p>
+
+<br><br>
+
+<img src="hardware/images/pcb_black.png" width="820" alt="星屑灯の基板（左が表、右が裏）">
+
+<br><br>
+
+[Web モニター](https://monoradio102.github.io/stardust-lamp/)　·　[回路と基板](hardware/)　·　[ファーム](firmware/stardust/)
 
 </div>
 
 <br>
-
-星がその一生を終えるとき、超新星爆発が起こります。その衝撃波で光の速さ近くまで加速された粒子は、銀河の磁場に導かれて、一千万年もの旅を続けます。
-
-地球の大気には、その粒子の雨が降り注いでいます。上空 15 km で空気の原子核とぶつかり、粒子は大気に溶けていきます。そのとき生まれるのが、ミューオンという小さな粒子です。ミューオンは今も、あなたの手のひらを毎秒ひとつずつ通り抜けています。
-
-このランプは、ミューオンがガイガー管に残すかすかな痕跡を増幅して、ふわりと灯ります。1 分に 2 回ほど。銀河を巡った旅の、最後のしるしです。
 
 ## しくみ
 
