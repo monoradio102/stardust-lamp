@@ -5,15 +5,19 @@
   <img src="brand/hoshikuzu_stacked_ink.svg" width="300" alt="星屑灯 HOSHIKUZU-TŌ">
 </picture>
 
-<br><br>
+<br>
 
 <h3>銀河を旅する星屑が、灯す明かり</h3>
 
 <br>
 
+[Web モニター](https://monoradio102.github.io/stardust-lamp/)　·　[回路と基板](hardware/)　·　[ファーム](firmware/stardust/)
+
+
 <img src="hardware/images/lamp.jpg" width="820" alt="星屑灯。上下に重ねた 2 本のガイガー管と、光った瞬間の基板">
 
 <br><br>
+
 
 <p>
 星がその一生を終えるとき、超新星爆発が起こります。<br>
@@ -37,9 +41,8 @@
 
 <p>
 このランプは、そのミューオンがガイガー管に残す<br>
-かすかな痕跡を増幅して、ふわりと灯ります。<br>
-1 分に 2 回ほど。<br>
-<b>銀河を巡った旅の、最後のしるしです。</b>
+かすかな痕跡を増幅して、1 分に 2 回ほど、ふわりと灯ります。<br>
+銀河を巡った旅の、最後のしるしです。
 </p>
 
 <br><br>
@@ -48,11 +51,8 @@
 
 <br><br>
 
-[Web モニター](https://monoradio102.github.io/stardust-lamp/)　·　[回路と基板](hardware/)　·　[ファーム](firmware/stardust/)
-
 </div>
 
-<br>
 
 ## しくみ
 
