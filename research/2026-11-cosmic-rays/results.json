@@ -1,0 +1,260 @@
+{
+ "before": {
+  "start": "2026-11-07T11:01:20",
+  "end": "2026-11-09T08:45:21",
+  "hours": 45.73,
+  "record_gaps_over_25s": 0,
+  "hv": {
+   "min": 362.8,
+   "max": 372.8,
+   "mean": 366.4,
+   "sd": 1.98
+  },
+  "raw": {
+   "A": 51705,
+   "B": 38684,
+   "C": 5880
+  },
+  "count": {
+   "A": 47829,
+   "B": 37431,
+   "C": 5435
+  },
+  "rate_per_min": {
+   "A": 17.43,
+   "B": 13.641,
+   "C": 1.981
+  },
+  "c_rate_err": 0.027,
+  "multi_c_per_hour": 6.84,
+  "repeat_per_hour": 83.6,
+  "repeat_chance_per_hour": 4.9,
+  "dt": {
+   "in_window": 5427,
+   "median_us": 13.0,
+   "share_9_17_pct": 93.5,
+   "share_m24_m15_pct": 5.3,
+   "pos_mean_us": 14.1,
+   "neg_mean_us": -19.7,
+   "neg_share_pct": 5.4
+  },
+  "accidental": {
+   "pairs_0p1_5ms": 89,
+   "expected_0p1_5ms": 106.6,
+   "in_window_expected": 2.17,
+   "in_window_share_pct": 0.04
+  },
+  "delayed_D": 5.0,
+  "delayed_expected": 4.34,
+  "interval": {
+   "n": 5434,
+   "mean_s": 30.3,
+   "median_s": 21.1,
+   "exp_median_s": 21.0,
+   "max_s": 252.3,
+   "p_max": 1.31,
+   "ks_p": 0.87
+  },
+  "per_minute": {
+   "minutes": 2744,
+   "mean": 1.981,
+   "var": 2.028,
+   "obs": [
+    382,
+    751,
+    747,
+    484,
+    236,
+    90,
+    36,
+    16,
+    2
+   ],
+   "exp": [
+    378.6,
+    749.9,
+    742.7,
+    490.3,
+    242.8,
+    96.2,
+    31.7,
+    9.0,
+    2.2
+   ],
+   "chi2": 9.1,
+   "dof": 6,
+   "p": 0.17
+  },
+  "hourly_c": {
+   "hours": 44,
+   "mean": 118.9,
+   "min": 92,
+   "max": 152,
+   "chi2": 49.9,
+   "dof": 43,
+   "p": 0.22
+  },
+  "hourly_c_raw": {
+   "chi2": 62.5,
+   "dof": 43,
+   "p": 0.027
+  },
+  "rate_per_min_raw": {
+   "A": 18.843,
+   "B": 14.098,
+   "C": 2.143
+  }
+ },
+ "main": {
+  "start": "2026-11-09T09:30:51",
+  "end": "2026-11-09T19:30:48",
+  "hours": 10.0,
+  "record_gaps_over_25s": 0,
+  "hv": {
+   "min": 359.2,
+   "max": 360.1,
+   "mean": 359.8,
+   "sd": 0.12
+  },
+  "raw": {
+   "A": 10333,
+   "B": 8150,
+   "C": 1162
+  },
+  "count": {
+   "A": 10302,
+   "B": 8130,
+   "C": 1162
+  },
+  "rate_per_min": {
+   "A": 17.171,
+   "B": 13.551,
+   "C": 1.937
+  },
+  "c_rate_err": 0.057,
+  "multi_c_per_hour": 0.0,
+  "repeat_per_hour": 5.1,
+  "repeat_chance_per_hour": 4.8,
+  "dt": {
+   "in_window": 1161,
+   "median_us": 16.0,
+   "share_9_17_pct": 88.8,
+   "share_m24_m15_pct": 9.3,
+   "pos_mean_us": 15.8,
+   "neg_mean_us": -21.4,
+   "neg_share_pct": 9.5
+  },
+  "accidental": {
+   "pairs_0p1_5ms": 17,
+   "expected_0p1_5ms": 22.8,
+   "in_window_expected": 0.47,
+   "in_window_share_pct": 0.04
+  },
+  "delayed_D": 1.0,
+  "delayed_expected": 0.94,
+  "interval": {
+   "n": 1161,
+   "mean_s": 31.0,
+   "median_s": 22.3,
+   "exp_median_s": 21.5,
+   "max_s": 269.6,
+   "p_max": 0.19,
+   "ks_p": 0.4
+  },
+  "per_minute": {
+   "minutes": 599,
+   "mean": 1.93,
+   "var": 1.765,
+   "obs": [
+    84,
+    157,
+    184,
+    92,
+    61,
+    15,
+    6
+   ],
+   "exp": [
+    87.0,
+    167.8,
+    161.9,
+    104.2,
+    50.3,
+    19.4,
+    6.2
+   ],
+   "chi2": 9.2,
+   "dof": 5,
+   "p": 0.1
+  },
+  "hourly_c": {
+   "hours": 9,
+   "mean": 116.6,
+   "min": 105,
+   "max": 133,
+   "chi2": 6.3,
+   "dof": 8,
+   "p": 0.62
+  },
+  "hourly_c_raw": {
+   "chi2": 6.3,
+   "dof": 8,
+   "p": 0.618
+  },
+  "rate_per_min_raw": {
+   "A": 17.223,
+   "B": 13.584,
+   "C": 1.937
+  }
+ },
+ "geometry": {
+  "L5": {
+   "G_cm2sr": 4.452,
+   "G_err": 0.014,
+   "pred_per_min": 1.87,
+   "side_by_side_G": 0.655,
+   "stacked_over_side": 6.8,
+   "theta_mean_deg": 28.0,
+   "theta_median_deg": 26.8
+  },
+  "L7": {
+   "G_cm2sr": 6.293,
+   "G_err": 0.016,
+   "pred_per_min": 2.64,
+   "side_by_side_G": 0.927,
+   "stacked_over_side": 6.79,
+   "theta_mean_deg": 28.1,
+   "theta_median_deg": 27.0
+  },
+  "I0_measured_range": [
+   72.5,
+   51.3
+  ]
+ },
+ "tube": {
+  "d_mm": 10.0,
+  "sep_mm": 12.0,
+  "glass_mm": 70.0,
+  "transit_ns": 0.04
+ },
+ "tilt": {
+  "0": 1.001,
+  "15": 0.946,
+  "30": 0.788,
+  "45": 0.573,
+  "60": 0.36,
+  "75": 0.204,
+  "90": 0.146
+ },
+ "relativity": {
+  "gamma": 37.9,
+  "ctau_m": 658.6,
+  "decay_length_km": 24.9,
+  "survive_with": 0.55,
+  "survive_without": "1.3e-10"
+ },
+ "per_day": {
+  "count": 2789,
+  "rel_err_pct": 1.89
+ }
+}
