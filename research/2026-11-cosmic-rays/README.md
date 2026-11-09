@@ -113,11 +113,11 @@
 到来が互いに独立で、計数率 $`R`$ が一定なら、時間 $`\Delta T`$ の計数 $`k`$ はポアソン分布に従い、到来間隔 $`\Delta t`$ は指数分布に従う。
 
 ```math
-P(k) = \frac{\lambda^{k}\, e^{-\lambda}}{k!}, \qquad \lambda = R\,\Delta T \tag{1}
+P(k) = \frac{\lambda^{k}\, e^{-\lambda}}{k!}, \qquad \lambda = R\,\Delta T \qquad\qquad (1)
 ```
 
 ```math
-p(\Delta t) = R\, e^{-R\,\Delta t}, \qquad \langle \Delta t \rangle = \frac{1}{R}, \qquad \Delta t_{1/2} = \frac{\ln 2}{R} \tag{2}
+p(\Delta t) = R\, e^{-R\,\Delta t}, \qquad \langle \Delta t \rangle = \frac{1}{R}, \qquad \Delta t_{1/2} = \frac{\ln 2}{R} \qquad\qquad (2)
 ```
 
 <picture>
@@ -141,7 +141,7 @@ p(\Delta t) = R\, e^{-R\,\Delta t}, \qquad \langle \Delta t \rangle = \frac{1}{R
 互いに無関係な 2 本の反応が、たまたま窓に入る率は
 
 ```math
-R_\mathrm{acc} = 2\,\tau\, R_A\, R_B \tag{3}
+R_\mathrm{acc} = 2\,\tau\, R_A\, R_B \qquad\qquad (3)
 ```
 
 である。観測 B では、窓の中の偶然同時計数の期待値は 0.47 事象で、同時計数全体の 0.04% にあたる。
@@ -201,13 +201,13 @@ R_\mathrm{acc} = 2\,\tau\, R_A\, R_B \tag{3}
 地上のミューオンの強度は、天頂角 $`\theta`$ に対して近似的に
 
 ```math
-I(\theta) = I_0 \cos^2\theta \tag{4}
+I(\theta) = I_0 \cos^2\theta \qquad\qquad (4)
 ```
 
 と表される [1]。方向 $`(\theta, \phi)`$ について、2 本の管を両方とも通る直線の束を、その方向に垂直な面へ射影した面積を $`A_\perp(\theta, \phi)`$ とすると、計数率は次のようになる。
 
 ```math
-R = \varepsilon \int_{\Omega} I(\theta)\, A_\perp(\theta,\phi)\, d\Omega = \varepsilon\, I_0\, G, \qquad G \equiv \int_{\Omega} \cos^2\theta\, A_\perp(\theta,\phi)\, d\Omega \tag{5}
+R = \varepsilon \int_{\Omega} I(\theta)\, A_\perp(\theta,\phi)\, d\Omega = \varepsilon\, I_0\, G, \qquad G \equiv \int_{\Omega} \cos^2\theta\, A_\perp(\theta,\phi)\, d\Omega \qquad\qquad (5)
 ```
 
 ここで $`\varepsilon`$ は検出効率と遮へいを含む係数である。幾何学的因子 $`G`$ は、水平面を通る直線を $`\cos^3\theta`$（強度 × 面への射影）の重みで発生させるモンテカルロ法で求めた（図 2、付録のコード）。GM 管の有感長は直接測れないので、ガラス長 7 cm と、両端の電極部を除いた 5 cm の 2 通りで計算した（表 5）。
@@ -237,7 +237,7 @@ $`\varepsilon = 1`$ として式 (5) を逆に解くと、鉛直強度は $`I_0 
 ミューオンの静止系での寿命は $`\tau_\mu = 2.197\ \mu\mathrm{s}`$ であり [1]、光速で飛んでも $`c\tau_\mu \approx `$ 659 m しか進めない。それでも上空 15 km で生まれたミューオンが地上で数えられるのは、特殊相対論の時間の遅れによる [2, 3]。エネルギー $`E`$ のミューオンについて
 
 ```math
-\gamma = \frac{E}{m_\mu c^2}, \qquad L = \gamma \beta\, c\, \tau_\mu, \qquad \frac{N(h)}{N_0} = e^{-h/L} \tag{6}
+\gamma = \frac{E}{m_\mu c^2}, \qquad L = \gamma \beta\, c\, \tau_\mu, \qquad \frac{N(h)}{N_0} = e^{-h/L} \qquad\qquad (6)
 ```
 
 である。地上での典型的なエネルギー $`E \approx 4`$ GeV（$`m_\mu c^2 = 105.7`$ MeV）では $`\gamma \approx `$ 38、平均飛行距離 $`L \approx `$ 25 km となる（表 6）。
