@@ -12,15 +12,19 @@
 //   hv <V>              high voltage target, 0 = off (starts at 0 until saved with "save")
 //   mode cosmic|rad|digital
 //   win <us>            coincidence window for the MCU's own count (digital mode, log column C)
+//   dead <us>           per-tube dead time for the MCU's count: a pulse closer than this to the last counted
+//                       pulse of the same tube is dropped (0 = count every edge). The HV recharge after a
+//                       discharge can make a tube input fire again 20-90 us later; without this, one muon was
+//                       counted 2-4 times in about 7 % of coincidences (long run 2026-11-07..09)
 //   log <s>             log interval
 //   kick <ms>           charge the glow capacitor from the MCU (test the LED)
 //   flash <ms>          rad mode: each hit lights the lamp this long, then the glow is emptied at once
 //                       (0 = the old soft way: every hit adds a little charge and FADE lets it go)
 //   sweep <from> <to> <step> <s>   plateau scan: counts per tube at each voltage
 //   hvon <counts>       HV drive: 0 = steady 31 kHz with the on-time regulated (the old way); otherwise
-//                       burst: fixed on-time of <counts> x 50 ns, switched on and off every 1 ms to hold the
-//                       target (far fewer pulses, so far less switching loss; the log "on" column is then the
-//                       share of time the drive ran, in 0.1 %)
+//                       pulse drive: fixed on-time of <counts> x 50 ns, far fewer pulses, so far less switching
+//                       loss. The pulses are spread out evenly (see hvBurst); the log "on" column is then the
+//                       pulses sent as a share of the steady 31 kHz rate, in 0.1 %
 //   ev on|off           print "e,A" / "e,B" for every hit and "e,C" for every coincidence, as they happen
 //                       (for live displays; not saved)
 //   dt on|off           print "dt,<us>" for every A-B pair closer than DT_MAX_US (tB - tA; not saved)
@@ -38,7 +42,7 @@
 
 // Bump on every change that is flashed: MAJOR when the log or command format breaks old tools,
 // MINOR for new commands or behavior, PATCH for fixes. Record it in CHANGELOG.md.
-#define FW_VERSION "1.4.0"
+#define FW_VERSION "1.6.0"
 #include <avr/sleep.h>
 
 // ---- pins ----
@@ -78,10 +82,14 @@ struct Settings {
   uint16_t logS;
   uint8_t flashMs;  // rad mode flash length, 0 = soft
   uint16_t burstOn;  // HV burst on-time in 50 ns counts, 0 = steady drive
+  uint16_t deadUs;   // per-tube dead time for the MCU's count
 };
-const uint16_t MAGIC = 0x5D03;
-const uint16_t MAGIC_V2 = 0x5D02;  // same layout without burstOn
-Settings cfg = {MAGIC, 0, COSMIC, 100, 10, 30, 300};
+const uint16_t MAGIC = 0x5D04;
+const uint16_t MAGIC_V3 = 0x5D03;  // same layout without deadUs
+const uint16_t MAGIC_V2 = 0x5D02;  // same layout without burstOn and deadUs
+// dead 200: the repeat pulses all fell within 100 us of the first (none in excess from 100 us to 5 ms),
+// so twice that; a tube near 20 CPM loses less than 1 real hit in 10,000 to it
+Settings cfg = {MAGIC, 0, COSMIC, 100, 10, 30, 300, 200};
 
 // ---- event counting (interrupts) ----
 volatile uint32_t lastA = 0, lastB = 0;
@@ -112,6 +120,7 @@ static inline bool within(uint32_t d, uint32_t lo, uint32_t hi) { return d >= lo
 
 void onTubeA() {
   uint32_t t = micros();
+  if (seenA && t - lastA < cfg.deadUs) return;  // a repeat of the same discharge (lastA stays at the first)
   hitsA++;
   pendingKickA++;
   pushEv('A');
@@ -127,6 +136,7 @@ void onTubeA() {
 
 void onTubeB() {
   uint32_t t = micros();
+  if (seenB && t - lastB < cfg.deadUs) return;
   hitsB++;
   pendingKickB++;
   pushEv('B');
@@ -144,10 +154,18 @@ void onTubeB() {
 // FAULTCTRL (which hands the pin to TCD0) and CTRLB are enable-protected: they only take while TCD0 is
 // stopped, so they are written once in hvSetup(). Off = TCD0 stopped, and the pin then sits low.
 float onCounts = 0;
-uint32_t runMs = 0, allMs = 0, runSince = 0;  // burst drive bookkeeping
+uint32_t allMs = 0, runSince = 0;  // pulse drive bookkeeping
+float runEq = 0;                   // pulses sent, in ms at the steady 31 kHz rate
 uint32_t stuckSince = 0;
 const char *fault = nullptr;
 bool tcdRunning = false;
+const uint16_t PULSE_FAST = HV_PERIOD / 4;  // period in 200 ns counts at the steady 31 kHz rate
+const uint16_t PULSE_SLOW = 4095;           // the longest TCD0 period: 819 us, 1.2 kHz
+const float PULSE_DUTY = 0.7;               // share of 1 ms steps the drive should be on
+const float PULSE_DUTY_K = 1.0 / 64;        // the share is averaged over about 64 ms
+const float PULSE_RATE_K = 0.002;           // period change per ms per unit of share error (seconds to settle)
+float pulsePeriod = PULSE_FAST;             // starts at full rate, so the HV comes up as fast as before
+float pulseDuty = PULSE_DUTY;
 
 void hvSetup() {
   digitalWrite(PIN_HV_DRV, LOW);
@@ -172,6 +190,7 @@ void hvApply(uint16_t counts) {
   }
   TCD0.CMPACLR = counts;
   if (!tcdRunning) {
+    TCD0.CMPBCLR = HV_PERIOD - 1;  // the pulse drive may have left a longer period
     while (!(TCD0.STATUS & TCD_ENRDY_bm)) {}
     TCD0.CTRLA = TCD_CLKSEL_20MHZ_gc | TCD_CNTPRES_DIV1_gc | TCD_ENABLE_bm;
     tcdRunning = true;
@@ -183,6 +202,8 @@ void hvApply(uint16_t counts) {
 void hvStop(const char *why) {
   onCounts = 0;
   runSince = 0;
+  pulsePeriod = PULSE_FAST;  // the next start comes up at full rate
+  pulseDuty = PULSE_DUTY;
   hvApply(0);
   if (why) {
     fault = why;
@@ -209,19 +230,42 @@ float readVbat() {
 
 float hvNow = 0;
 
-// Burst drive, every 1 ms: the HV load is only the feedback divider (a few uA), while every switching cycle
-// throws away the charge on the switch node. So run whole cycles with a long fixed on-time while the HV is
-// below the target and stop the timer above it. runMs / allMs give the share of time the drive ran.
+// Pulse drive for hvon > 0, with TCD0 counting at 5 MHz (DIV4) so the period can reach 819 us.
+// The HV load is only the feedback divider (a few uA), while every switching cycle throws away the charge on
+// the switch node, so the drive sends few pulses with a long fixed on-time.
+// 1.3.0-1.5.0 ran the pulses at the full 31 kHz for a whole 1 ms whenever the HV was low: about one 1 ms burst
+// every 14 ms, at an uneven rhythm around 70 Hz. Each burst kicked the HV up a little, and that reached the
+// lamp as a visible flicker (and is the likely cause of the repeat pulses that dead time now drops).
+// Now the on/off decision is still made every 1 ms, but while on, the pulses come at a rate that is tuned
+// slowly so that the drive is on in about PULSE_DUTY of the steps: each on-step then sends only a few pulses,
+// and the off-steps are short and frequent, so the HV ripple is small and far above what the eye follows.
+
+void hvPulse(uint16_t counts) {  // counts in 50 ns, like hvon
+  TCD0.CMPACLR = (counts + 2) / 4;
+  TCD0.CMPBCLR = (uint16_t)pulsePeriod - 1;
+  if (!tcdRunning) {
+    while (!(TCD0.STATUS & TCD_ENRDY_bm)) {}
+    TCD0.CTRLA = TCD_CLKSEL_20MHZ_gc | TCD_CNTPRES_DIV4_gc | TCD_ENABLE_bm;
+    tcdRunning = true;
+  } else {
+    TCD0.CTRLE = TCD_SYNCEOC_bm;
+  }
+}
+
 void hvBurst() {
   uint16_t raw = analogRead(PIN_HV_FB) + analogRead(PIN_HV_FB);
   float v = raw / 2.0 / 1023.0 * 1.5 * HV_DIV;
   hvNow += (v - hvNow) * 0.1;  // smoothed for the log and status
   if (v > HV_TRIP) { if (tcdRunning || cfg.hvTarget) hvStop("over voltage"); return; }  // report once
   allMs++;
-  if (cfg.hvTarget == 0) { if (tcdRunning) hvStop(nullptr); runSince = 0; return; }
-  if (v < cfg.hvTarget) {
-    hvApply(min(cfg.burstOn, HV_ON_MAX));
-    runMs++;
+  if (cfg.hvTarget == 0) { if (tcdRunning) hvStop(nullptr); runSince = 0; pulsePeriod = PULSE_FAST; return; }
+  bool on = v < cfg.hvTarget;
+  pulseDuty += ((on ? 1.0 : 0.0) - pulseDuty) * PULSE_DUTY_K;
+  pulsePeriod *= 1 - PULSE_RATE_K * (pulseDuty - PULSE_DUTY);  // on too often: pulse faster
+  pulsePeriod = constrain(pulsePeriod, PULSE_FAST, PULSE_SLOW);
+  if (on) {
+    hvPulse(min(cfg.burstOn, HV_ON_MAX));
+    runEq += PULSE_FAST / pulsePeriod;
     if (!runSince) runSince = millis();
     if (v < cfg.hvTarget * 0.5 && millis() - runSince > HV_STUCK_MS) hvStop("no rise at full drive (feedback open or short?)");
   } else {
@@ -365,6 +409,7 @@ void printStatus() {
   else { Serial.print(F(" V, on ")); Serial.print((uint16_t)onCounts); }
   Serial.print(F(", mode ")); Serial.print(MODE_NAMES[cfg.mode]);
   Serial.print(F(", win ")); Serial.print(cfg.winUs);
+  Serial.print(F(" us, dead ")); Serial.print(cfg.deadUs);
   Serial.print(F(" us, flash ")); Serial.print(cfg.flashMs);
   Serial.print(F(" ms"));
   Serial.print(F(", log ")); Serial.print(cfg.logS);
@@ -387,13 +432,14 @@ void runCommand(char *s) {
     for (uint8_t i = 0; i < 3; i++) if (!strcmp(a1, MODE_NAMES[i])) cfg.mode = i;
   } else if (!strcmp(cmd, "win") && a1) {
     cfg.winUs = constrain(atoi(a1), 5, 5000);
+  } else if (!strcmp(cmd, "dead") && a1) {
+    cfg.deadUs = constrain(atoi(a1), 0, 5000);
   } else if (!strcmp(cmd, "log") && a1) {
     cfg.logS = constrain(atoi(a1), 1, 3600);
   } else if (!strcmp(cmd, "flash") && a1) {
     cfg.flashMs = constrain(atoi(a1), 0, 200);
   } else if (!strcmp(cmd, "hvon") && a1) {
-    hvApply(0);
-    onCounts = 0;
+    hvStop(nullptr);
     cfg.burstOn = constrain(atoi(a1), 0, (int)HV_ON_MAX);
   } else if (!strcmp(cmd, "ev") && a1) {
     evOn = !strcmp(a1, "on");
@@ -490,7 +536,12 @@ void setup() {
   Settings saved;
   EEPROM.get(0, saved);
   if (saved.magic == MAGIC) cfg = saved;
-  else if (saved.magic == MAGIC_V2) { saved.burstOn = cfg.burstOn; saved.magic = MAGIC; cfg = saved; }  // a saved HV target starts the lamp on its own; first boot stays at 0
+  else if (saved.magic == MAGIC_V3 || saved.magic == MAGIC_V2) {  // older layouts: keep what they had, default the rest
+    if (saved.magic == MAGIC_V2) saved.burstOn = cfg.burstOn;
+    saved.deadUs = cfg.deadUs;
+    saved.magic = MAGIC;
+    cfg = saved;
+  }  // a saved HV target starts the lamp on its own; first boot stays at 0
 
   pinMode(PIN_KICK, INPUT);
   pinMode(PIN_OUT, OUTPUT);
@@ -528,7 +579,7 @@ void loop() {
     takeCounts(a, b, c, d);
     Serial.print(millis() / 1000); Serial.print(',');
     Serial.print(hvNow, 1); Serial.print(',');
-    if (cfg.burstOn) { Serial.print(allMs ? runMs * 1000 / allMs : 0); runMs = allMs = 0; }
+    if (cfg.burstOn) { Serial.print(allMs ? (uint16_t)(runEq * 1000 / allMs) : 0); runEq = 0; allMs = 0; }
     else Serial.print((uint16_t)onCounts);
     Serial.print(',');
     Serial.print(a); Serial.print(','); Serial.print(b); Serial.print(',');

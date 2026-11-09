@@ -242,6 +242,7 @@
       <div class="pane" id="tab-set">
         <div class="field set"><label>高圧<small>管にかける電圧（0 で停止）</small></label><input id="iHv" type="number" min="0" max="450" step="5"><span class="unit">V</span><button data-set="hv">反映</button></div>
         <div class="field set"><label>同時の幅<small>2 本の反応をひとつとみなす時間</small></label><input id="iWin" type="number" min="5" max="5000" step="5"><span class="unit">µs</span><button data-set="win">反映</button></div>
+        <div class="field set"><label>不感時間<small>同じ管のパルスをこの間は数えない（0 で全部）</small></label><input id="iDead" type="number" min="0" max="5000" step="10"><span class="unit">µs</span><button data-set="dead">反映</button></div>
         <div class="field set"><label>放射線モードで光る長さ</label><input id="iFlash" type="number" min="0" max="200" step="5"><span class="unit">ms</span><button data-set="flash">反映</button></div>
         <div class="field set"><label>高圧のオン時間<small>×50 ns。0 で連続駆動</small></label><input id="iHvon" type="number" min="0" max="300" step="10"><span class="unit"></span><button data-set="hvon">反映</button></div>
         <div class="field set"><label>ログの間隔</label><input id="iLog" type="number" min="1" max="3600" step="1"><span class="unit">秒</span><button data-set="log">反映</button></div>
@@ -592,7 +593,7 @@ function showStatus() {
 }
 function fillInputs() {  // put the board's values into the boxes, unless the person is typing in one
   const set = (id, v) => { if (v !== undefined && document.activeElement !== $(id)) $(id).value = v; };
-  set("iHv", status.hv_target); set("iWin", status.win_us); set("iFlash", status.flash_ms);
+  set("iHv", status.hv_target); set("iWin", status.win_us); set("iDead", status.dead_us); set("iFlash", status.flash_ms);
   set("iHvon", status.burst !== undefined ? status.burst : 0); set("iLog", status.log_s);
 }
 
@@ -778,6 +779,7 @@ function parseStatus(line) {
     else if (part.startsWith("on ")) { out.burst = 0; out.on = parseInt(w[1]); }
     else if (part.startsWith("mode")) out.mode = w[1];
     else if (part.startsWith("win")) out.win_us = parseInt(w[1]);
+    else if (part.startsWith("dead")) out.dead_us = parseInt(w[1]);
     else if (part.startsWith("flash")) out.flash_ms = parseInt(w[1]);
     else if (part.startsWith("log")) out.log_s = parseInt(w[1]);
     else if (part.startsWith("fault")) out.fault = part.slice(6);
@@ -886,7 +888,7 @@ setInterval(() => {
 // ---------------- buttons ----------------
 const MODE_JP = { cosmic: "宇宙線", rad: "放射線", digital: "デジタル" };
 document.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => cmd("mode " + b.dataset.mode, `光り方を「${MODE_JP[b.dataset.mode]}」にしました`));
-const inputOf = { hv: "iHv", win: "iWin", flash: "iFlash", hvon: "iHvon", log: "iLog" };
+const inputOf = { hv: "iHv", win: "iWin", dead: "iDead", flash: "iFlash", hvon: "iHvon", log: "iLog" };
 document.querySelectorAll("[data-set]").forEach(b => b.onclick = () => {
   const v = $(inputOf[b.dataset.set]).value;
   if (v === "" || isNaN(+v)) return;
