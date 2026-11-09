@@ -11,10 +11,10 @@
 
 <br>
 
-[Web モニター](https://monoradio102.github.io/stardust-lamp/)　·　[回路と基板](hardware/)　·　[ファーム](firmware/stardust/)
+[紹介動画](https://youtu.be/LIFDgEcAJlk)　·　[Web モニター](https://monoradio102.github.io/stardust-lamp/)　·　[回路と基板](hardware/)　·　[ファーム](firmware/stardust/)
 
 
-<img src="images/hero.jpg" width="820" alt="宇宙線が通ると、光る。暗い部屋で青く光った星屑灯">
+<a href="https://youtu.be/LIFDgEcAJlk"><img src="images/hero.jpg" width="820" alt="宇宙線が通ると、光る。暗い部屋で青く光った星屑灯（クリックで紹介動画へ）"></a>
 
 <br><br>
 
